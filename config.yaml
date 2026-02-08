@@ -1,0 +1,15 @@
+# CI Tool Configuration
+server:
+  workspace: "/ci/workspace"
+
+git:
+  accessToken: ${Token}
+  repo_url: "https://github.com/example/repo.git"
+
+jobs:
+  - name: "Example"
+    watch_files:
+      - "src/*.py"
+      - "requirements.txt"
+    script: "./scripts/build.sh"
+    target_branch: "build-output"
