@@ -1,8 +1,20 @@
 import argparse
 import uvicorn
 import os
+import yaml
+import sys
 from .core.config import Settings
 from .core.logging_config import setup_logging
+
+def print_default_config():
+    """
+    デフォルト設定をYAML形式で標準出力する。
+    """
+    settings = Settings()
+    # Pydanticモデルをdictに変換し、YAMLとして出力
+    # `exclude_unset=False` は、設定されていなくてもデフォルト値を持つフィールドを含めるために重要
+    config_dict = settings.model_dump(mode='python')
+    print(yaml.dump(config_dict, sort_keys=False))
 
 if __name__ == "__main__":
     if not os.path.exists("log"):
@@ -11,7 +23,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="ToyCI Server")
     parser.add_argument("-a", "--address", help="Host address to bind to", default=None)
     parser.add_argument("-p", "--port", help="Port to bind to", type=int, default=None)
+    parser.add_argument("--print-default-config", action="store_true", help="Print default configuration and exit")
     args = parser.parse_args()
+
+    if args.print_default_config:
+        print_default_config()
+        sys.exit(0)
 
     # 初期設定ロード (Settingsクラスを使用)
     settings = Settings.load()
