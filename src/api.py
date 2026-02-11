@@ -1,13 +1,32 @@
 import logging
-import fnmatch
+import logging.config
+import yaml
+import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, BackgroundTasks
 from .core import load_config, run_job
 from .core.webhook_handler import WebhookProviderFactory
 from .core.job_trigger import JobTriggerService
 
-logger = logging.getLogger(__name__)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Load logging configuration
+    if not os.path.exists("log"):
+        os.makedirs("log")
+    
+    if os.path.exists("logging.yaml"):
+        with open("logging.yaml", "r") as f:
+            log_config = yaml.safe_load(f)
+            logging.config.dictConfig(log_config)
+            logging.info("Logging configuration loaded from logging.yaml")
+    else:
+        logging.basicConfig(level=logging.INFO)
+        logging.warning("logging.yaml not found, using basic config")
 
-app = FastAPI()
+    yield
+
+logger = logging.getLogger(__name__)
+app = FastAPI(lifespan=lifespan)
 
 @app.post("/webhook")
 async def webhook(request: Request, background_tasks: BackgroundTasks):
