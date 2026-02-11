@@ -32,12 +32,12 @@ class JobTriggerService:
 
         should_skip = provider.should_skip(payload)
         if should_skip:
-            logger.info(f"Skipping processing for provider {provider.get_provider_id()} based on payload.")
+            logger.info(f"ペイロードに基づいてプロバイダー {provider.get_provider_id()} の処理をスキップします。")
             return []
 
         # 1. プロバイダーを使って変更ファイルを抽出
         changed_files = provider.extract_changed_files(payload)
-        logger.info(f"Changed files extracted by {provider.get_provider_id()}: {changed_files}")
+        logger.info(f"{provider.get_provider_id()} によって抽出された変更ファイル: {changed_files}")
         
         if not changed_files:
              # 変更ファイルがない場合は処理終了（pingイベントなど）
@@ -47,7 +47,7 @@ class JobTriggerService:
         try:
             config = self.config_loader()
         except Exception as e:
-            logger.error(f"Failed to load configuration: {e}")
+            logger.error(f"設定の読み込みに失敗しました: {e}")
             return []
         
         # 3. ジョブを走査し、実行すべきものを特定
@@ -59,7 +59,7 @@ class JobTriggerService:
             job_name = job.get("name", "unknown")
             
             if self._should_run_job(changed_files, watch_patterns):
-                logger.info(f"Job '{job_name}' triggered by changes.")
+                logger.info(f"変更によりジョブ '{job_name}' がトリガーされました。")
                 
                 # 4. バックグラウンドタスクに追加
                 try:
@@ -67,9 +67,9 @@ class JobTriggerService:
                     background_tasks.add_task(self.job_runner, job, payload_meta)
                     triggered_jobs.append(job_name)
                 except Exception as e:
-                    logger.error(f"Failed to trigger job '{job_name}': {e}")
+                    logger.error(f"ジョブ '{job_name}' のトリガーに失敗しました: {e}")
             else:
-                logger.debug(f"Job '{job_name}' skipped (no matching files).")
+                logger.debug(f"ジョブ '{job_name}' はスキップされました (一致するファイルなし)。")
                 
         return triggered_jobs
 

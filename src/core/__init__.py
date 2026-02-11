@@ -32,7 +32,7 @@ def run_job(
     script = job.get("script")
     
     if not repo_url or not script or not target_branch:
-        logger.error(f"[{job_name}] Invalid configuration: repo_url, target_branch and script are required.")
+        logger.error(f"[{job_name}] 設定が無効です: repo_url, target_branch, script は必須です。")
         return
 
     # 全体設定の読み込み (アクセストークン取得のため)
@@ -46,10 +46,10 @@ def run_job(
 
     # 1. Workspace Preparation
     try:
-        logger.info(f"[{job_name}] Preparing workspace...")
+        logger.info(f"[{job_name}] ワークスペースを準備中...")
         work_dir = workspace_manager.prepare_workspace(job_name)
     except Exception as e:
-        logger.exception(f"[{job_name}] Failed to prepare workspace: {e}")
+        logger.exception(f"[{job_name}] ワークスペースの準備に失敗しました: {e}")
         return
 
     try:
@@ -57,11 +57,11 @@ def run_job(
         # work_dir は動的に決まるため、クラスではなくインスタンス化はここで行う必要がある
         # (DIでインスタンスを渡す場合はFactoryパターンなどが必要だが、ここではクラスを渡す形にする)
         vcs_handler = vcs_handler_cls(work_dir)
-        logger.info(f"[{job_name}] Preparing repository: {repo_url} ({target_branch})")
+        logger.info(f"[{job_name}] リポジトリを準備中: {repo_url} ({target_branch})")
         vcs_handler.prepare_repository(repo_url, target_branch, access_token)
 
         # 3. Job Execution
-        logger.info(f"[{job_name}] Running script: {script}")
+        logger.info(f"[{job_name}] スクリプトを実行中: {script}")
         executor = job_executor_cls()
         executor.execute(script, work_dir)
 
@@ -69,16 +69,16 @@ def run_job(
         if vcs_handler.has_changes():
             commit_id = commit_info.get('id', 'unknown')
             modified_files = ', '.join(commit_info.get('modified', []))
-            commit_message = f"Auto-generated commit by CI Tool for {commit_id}\n\nTriggered by changes in: {modified_files}"
+            commit_message = f"CIツールによる自動生成コミット ({commit_id})\n\n変更トリガー: {modified_files}"
             
-            logger.info(f"[{job_name}] Changes detected. Pushing to {target_branch}...")
+            logger.info(f"[{job_name}] 変更が検出されました。{target_branch} へプッシュします...")
             vcs_handler.commit_and_push(commit_message, target_branch)
-            logger.info(f"[{job_name}] Push successful.")
+            logger.info(f"[{job_name}] プッシュ成功。")
         else:
-            logger.info(f"[{job_name}] No changes detected.")
+            logger.info(f"[{job_name}] 変更は検出されませんでした。")
         
         # 5. Cleanup Workspace
         workspace_manager.cleanup_workspace(job_name)
 
     except Exception as e:
-        logger.exception(f"[{job_name}] Job failed: {e}")
+        logger.exception(f"[{job_name}] ジョブが失敗しました: {e}")

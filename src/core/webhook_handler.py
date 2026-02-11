@@ -82,5 +82,5 @@ class WebhookProviderFactory:
                 return provider
         
         # フォールバック: GitHub
-        logger.info("No matching provider found for headers, falling back to GitHubProvider")
+        logger.info("ヘッダーに一致するプロバイダーが見つかりませんでした。GitHubProvider にフォールバックします。")
         return cls._providers[0]

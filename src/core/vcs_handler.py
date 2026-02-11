@@ -48,12 +48,12 @@ class GitHandler(IVcsHandler):
                  auth_url = urlunparse(parsed._replace(netloc=new_netloc))
                  # ログにはトークンを出さないようにマスクしたURLを表示
                  masked_url = url.replace(access_token, "*****")
-                 logger.info(f"Cloning {masked_url} into {self.workspace_path} with access token...")
+                 logger.info(f"アクセストークンを使用して {masked_url} を {self.workspace_path} にクローンしています...")
              else:
-                 logger.warning("Access token provided but URL scheme is not http/https. Ignoring token.")
-                 logger.info(f"Cloning {url} into {self.workspace_path}...")
+                 logger.warning("アクセストークンが提供されましたが、URLスキームが http/https ではありません。トークンを無視します。")
+                 logger.info(f"{url} を {self.workspace_path} にクローンしています...")
         else:
-            logger.info(f"Cloning {url} into {self.workspace_path}...")
+            logger.info(f"{url} を {self.workspace_path} にクローンしています...")
 
         self.repo = Repo.clone_from(auth_url, self.workspace_path)
         
@@ -83,17 +83,17 @@ class GitHandler(IVcsHandler):
         if not self.repo:
             raise Exception("Repository not initialized")
             
-        logger.info(f"Changes detected. Committing...")
+        logger.info(f"変更が検出されました。コミット中...")
         self.repo.git.add(A=True)
         
         # Add [skip ci] prefix to the commit message to prevent CI loops
         full_message = f"[skip ci] {message}"
         self.repo.index.commit(full_message)
         
-        logger.info(f"Pushing changes to {branch}...")
+        logger.info(f"{branch} へ変更をプッシュしています...")
         origin = self.repo.remote(name='origin')
         origin.push(branch)
-        logger.info(f"Push successful.")
+        logger.info(f"プッシュ成功。")
 
     def repo_close(self) -> None:
         """リポジトリをクローズする (必要ならば)"""
