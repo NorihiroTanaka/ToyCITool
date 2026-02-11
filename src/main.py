@@ -23,8 +23,6 @@ if __name__ == "__main__":
     host = args.address if args.address else settings.server.host
     port = args.port if args.port else settings.server.port
 
-    print(f"Starting server at http://{host}:{port}")
-
     # uvicornのlog_config引数は、logging.yamlが存在する場合のみ指定する
     # 監視対象をsrc配下と設定ファイルに限定する
     reload_includes = ["src/**", "config.yaml", "logging.yaml"]
