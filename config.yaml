@@ -3,13 +3,13 @@ server:
   workspace: "workspace"
 
 git:
-  accessToken: ${Token}
-  repo_url: "https://github.com/example/repo.git"
+  accessToken: ${GIT_ACCESS_TOKEN}
 
 jobs:
   - name: "Example"
+    repo_url: ${GIT_REPO_URL}
     watch_files:
       - "src/*.py"
       - "requirements.txt"
-    script: "./scripts/build.sh"
-    target_branch: "build-output"
+    script: "scripts\\build.cmd"
+    target_branch: "main"

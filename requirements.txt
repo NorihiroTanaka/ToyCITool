@@ -15,3 +15,4 @@ uvicorn==0.40.0
 PyYAML
 GitPython
 watchfiles
+python-dotenv

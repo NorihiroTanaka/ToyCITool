@@ -25,7 +25,25 @@
    pip install -r requirements.txt
    ```
 
-2. サーバーの起動
+2. 環境変数の設定（オプション）
+   
+   `.env`ファイルを使用して環境変数を設定できます。
+   
+   ```bash
+   # .env_templateをコピーして.envを作成
+   copy .env_template .env  # Windows
+   # または
+   cp .env_template .env    # Linux/Mac
+   ```
+   
+   `.env`ファイルを編集して必要な環境変数を設定します：
+   ```
+   GIT_ACCESS_TOKEN=your_token_here
+   ```
+   
+   **注意**: `.env`ファイルはGitで管理されません（`.gitignore`に含まれています）。
+
+3. サーバーの起動
    
    推奨される起動方法は `src.main` モジュールを使用する方法です。これにより、コマンドライン引数での設定が可能になります。
 
@@ -95,4 +113,29 @@ jobs:
 
 ## 環境変数
 
+### .envファイルによる設定
+
+プロジェクトルートに`.env`ファイルを配置することで、環境変数を設定できます。
+`.env`ファイルは起動時に自動的に読み込まれ、システムの環境変数として登録されます。
+
+**優先順位**:
+1. システム環境変数（最優先）
+2. `.env`ファイルの値
+3. デフォルト値
+
+**例**: `.env`ファイル
+```
+GIT_ACCESS_TOKEN=your_github_token_here
+TOYCI_CONFIG_PATH=custom_config.yaml
+```
+
+これにより、`config.yaml`内で`${GIT_ACCESS_TOKEN}`のように環境変数を参照できます：
+```yaml
+git:
+  accessToken: ${GIT_ACCESS_TOKEN}
+```
+
+### 利用可能な環境変数
+
 - `TOYCI_CONFIG_PATH`: 設定ファイルのパスを指定します（デフォルト: `config.yaml`）。
+- `GIT_ACCESS_TOKEN`: Gitリポジトリへのアクセストークン（config.yamlで参照可能）。

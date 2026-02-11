@@ -2,6 +2,7 @@ from typing import List, Optional, Dict, Any
 import os
 import yaml
 from pydantic import BaseModel, Field
+from dotenv import load_dotenv
 
 class ServerConfig(BaseModel):
     host: str = "0.0.0.0"
@@ -29,7 +30,20 @@ class Settings(BaseModel):
         """
         設定ファイルを読み込み、Settingsオブジェクトを返す。
         環境変数の展開もサポートする。
+        
+        読み込み順序：
+        1. .envファイルから環境変数を読み込み（存在する場合）
+        2. config.yamlを読み込み
+        3. 環境変数を展開
         """
+        # .envファイルを読み込み（存在する場合のみ、既存の環境変数は上書きしない）
+        env_path = os.path.join(os.path.dirname(__file__), "..", "..", ".env")
+        env_path = os.path.normpath(env_path)
+        
+        if os.path.exists(env_path):
+            load_dotenv(env_path, override=False)
+        
+        # 既存のconfig.yaml読み込み処理
         path = config_path or os.environ.get("TOYCI_CONFIG_PATH", "config.yaml")
         
         if not os.path.exists(path):
