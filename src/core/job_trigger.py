@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List, Any, Callable, Optional
+from typing import Dict, List, Any, Optional
 from fastapi import BackgroundTasks
 
 from .interfaces import WebhookProvider, IJobMatcher, IJobService

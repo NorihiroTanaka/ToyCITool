@@ -1,7 +1,4 @@
 import logging
-import logging.config
-import yaml
-import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, BackgroundTasks
 from .core.logging_config import setup_logging
