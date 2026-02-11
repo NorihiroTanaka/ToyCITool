@@ -52,11 +52,14 @@ class JobService(IJobService):
             work_dir = self._prepare_workspace(job_name)
             
             # 2. VCS Operations & 3. Job Execution & 4. Result Handling
+            vcs_handler = None  # finallyブロックで参照できるよう初期化
             try:
                 vcs_handler = self._checkout_code(job_name, work_dir, repo_url_str, target_branch_str)
                 self._execute_script(job_name, work_dir, script_str)
                 self._handle_result(job_name, vcs_handler, commit_info, target_branch_str)
             finally:
+                if vcs_handler:
+                    vcs_handler.close()
                 # 5. Cleanup Workspace (エラーがあっても必ず実行)
                 self._cleanup_workspace(job_name)
 

@@ -66,8 +66,8 @@ class GitHandler(IVcsHandler):
         origin.push(branch)
         logger.info(f"プッシュ成功。")
 
-    def repo_close(self) -> None:
-        """リポジトリをクローズする (必要ならば)"""
+    def close(self) -> None:
+        """リポジトリをクローズする"""
         if self.repo:
             self.repo.close()
             self.repo = None

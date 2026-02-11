@@ -20,7 +20,7 @@ class IVcsHandler(ABC):
         pass
 
     @abstractmethod
-    def repo_close(self) -> None:
+    def close(self) -> None:
         pass
 
 class IJobService(ABC):

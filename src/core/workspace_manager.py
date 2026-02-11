@@ -1,5 +1,9 @@
 import os, stat
 import shutil
+import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 class WorkspaceManager:
     def __init__(self, base_dir: str = "./workspace"):
@@ -28,7 +32,14 @@ class WorkspaceManager:
         work_dir = os.path.join(self.base_dir, job_name)
         
         if os.path.exists(work_dir):
-            try:
-                shutil.rmtree(work_dir, onexc=self.remove_readonly)
-            except Exception as e:
-                raise Exception(f"Failed to clean workspace: {e}")
+            for i in range(3): # 最大3回リトライ
+                try:
+                    shutil.rmtree(work_dir, onexc=self.remove_readonly)
+                    logger.info(f"ワークスペース {work_dir} を削除しました。")
+                    return
+                except Exception as e:
+                    logger.warning(f"ワークスペースの削除に失敗しました (試行 {i+1}/3): {e}")
+                    time.sleep(1) # 1秒待機
+            
+            logger.error(f"ワークスペース {work_dir} の削除に最終的に失敗しました。")
+            raise Exception(f"Failed to clean workspace after multiple retries.")
