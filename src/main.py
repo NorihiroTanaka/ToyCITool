@@ -26,7 +26,23 @@ if __name__ == "__main__":
     print(f"Starting server at http://{host}:{port}")
 
     # uvicornのlog_config引数は、logging.yamlが存在する場合のみ指定する
+    # 監視対象をsrc配下と設定ファイルに限定する
+    reload_includes = ["src/**", "config.yaml", "logging.yaml"]
+
     if os.path.exists("logging.yaml"):
-        uvicorn.run("src.api:app", host=host, port=port, reload=True, log_config="logging.yaml")
+        uvicorn.run(
+            "src.api:app",
+            host=host,
+            port=port,
+            reload=True,
+            reload_includes=reload_includes,
+            log_config="logging.yaml",
+        )
     else:
-        uvicorn.run("src.api:app", host=host, port=port, reload=True)
+        uvicorn.run(
+            "src.api:app",
+            host=host,
+            port=port,
+            reload=True,
+            reload_includes=reload_includes,
+        )

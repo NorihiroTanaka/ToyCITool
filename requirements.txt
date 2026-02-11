@@ -14,3 +14,4 @@ typing_extensions==4.15.0
 uvicorn==0.40.0
 PyYAML
 GitPython
+watchfiles
