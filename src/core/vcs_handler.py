@@ -2,7 +2,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Dict, List, Any, Optional
 from git import Repo
-from urllib.parse import urlparse, urlunparse
+from .vcs_utils import inject_auth_token, mask_auth_token
 
 logger = logging.getLogger(__name__)
 
@@ -35,23 +35,13 @@ class GitHandler(IVcsHandler):
     def prepare_repository(self, url: str, branch: str, access_token: Optional[str] = None) -> None:
         """リポジトリをクローンし、指定ブランチをチェックアウトする"""
         
-        auth_url = url
+        # access_token が None の場合の対応を inject_auth_token 側でやってくれることを期待するか、ここで空文字を渡すか
+        token_str = access_token if access_token else ""
+        auth_url = inject_auth_token(url, token_str)
+        
         if access_token:
-             # URLにアクセストークンを埋め込む (https://<token>@github.com/...)
-             parsed = urlparse(url)
-             if parsed.scheme in ('http', 'https'):
-                 # netlocにはuser:pass@hostが含まれるが、単純に置換する
-                 # 既存の認証情報がある場合は上書きする
-                 new_netloc = f"{access_token}@{parsed.hostname}"
-                 if parsed.port:
-                     new_netloc += f":{parsed.port}"
-                 auth_url = urlunparse(parsed._replace(netloc=new_netloc))
-                 # ログにはトークンを出さないようにマスクしたURLを表示
-                 masked_url = url.replace(access_token, "*****")
-                 logger.info(f"アクセストークンを使用して {masked_url} を {self.workspace_path} にクローンしています...")
-             else:
-                 logger.warning("アクセストークンが提供されましたが、URLスキームが http/https ではありません。トークンを無視します。")
-                 logger.info(f"{url} を {self.workspace_path} にクローンしています...")
+            masked_url = mask_auth_token(url, access_token)
+            logger.info(f"アクセストークンを使用して {masked_url} を {self.workspace_path} にクローンしています...")
         else:
             logger.info(f"{url} を {self.workspace_path} にクローンしています...")
 

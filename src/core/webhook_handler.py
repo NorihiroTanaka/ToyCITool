@@ -39,12 +39,8 @@ class GitHubProvider(WebhookProvider):
         return "ci skip" in message or "[ci skip]" in message
 
     def can_handle(self, headers: Dict[str, str]) -> bool:
-        # FastAPI の headers は case-insensitive だが、念のため小文字でチェック
-        # headers オブジェクト自体は Headers クラスで key 検索は case-insensitive
-        # ここでは dict に変換されたものを想定するか、Headers オブジェクトの振る舞いに依存するか
-        # 汎用性を高めるため、キーを小文字に変換してチェックする
-        headers_lower = {k.lower(): v for k, v in headers.items()}
-        return "x-github-event" in headers_lower
+        # ヘッダーキーの大文字小文字を無視してチェック
+        return any(k.lower() == "x-github-event" for k in headers.keys())
 
     def extract_changed_files(self, payload: Dict[str, Any]) -> Set[str]:
         changed_files = set()

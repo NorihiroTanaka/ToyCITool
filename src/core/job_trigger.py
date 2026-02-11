@@ -1,21 +1,23 @@
-import fnmatch
 import logging
-from typing import Dict, List, Any, Callable
+from typing import Dict, List, Any, Callable, Optional
 from fastapi import BackgroundTasks
 
 from .webhook_handler import WebhookProvider
+from .job_matcher import JobMatcher
 
 logger = logging.getLogger(__name__)
 
 class JobTriggerService:
-    def __init__(self, config_loader: Callable[[], Dict[str, Any]], job_runner: Callable):
+    def __init__(self, config_loader: Callable[[], Dict[str, Any]], job_runner: Callable, job_matcher: Optional[JobMatcher] = None):
         """
         Args:
             config_loader: 設定ファイルを読み込む関数
             job_runner: ジョブを実行する関数 (run_job)
+            job_matcher: ジョブ実行条件を判定するマッチャー (省略時はデフォルトを使用)
         """
         self.config_loader = config_loader
         self.job_runner = job_runner
+        self.job_matcher = job_matcher or JobMatcher()
 
     def process_webhook_event(self, provider: WebhookProvider, payload: Dict[str, Any], background_tasks: BackgroundTasks) -> List[str]:
         """
@@ -55,10 +57,9 @@ class JobTriggerService:
         jobs = config.get("jobs", [])
         
         for job in jobs:
-            watch_patterns = job.get("watch_files", [])
             job_name = job.get("name", "unknown")
             
-            if self._should_run_job(changed_files, watch_patterns):
+            if self.job_matcher.match(job, changed_files):
                 logger.info(f"変更によりジョブ '{job_name}' がトリガーされました。")
                 
                 # 4. バックグラウンドタスクに追加
@@ -73,13 +74,3 @@ class JobTriggerService:
                 
         return triggered_jobs
 
-    def _should_run_job(self, changed_files: set, watch_patterns: List[str]) -> bool:
-        """変更ファイルが監視パターンにマッチするか判定する"""
-        if not watch_patterns:
-            return False
-
-        for file in changed_files:
-            for pattern in watch_patterns:
-                if fnmatch.fnmatch(file, pattern):
-                    return True
-        return False
