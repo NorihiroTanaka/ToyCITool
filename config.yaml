@@ -1,6 +1,6 @@
 # CI Tool Configuration
 server:
-  workspace: "/ci/workspace"
+  workspace: "workspace"
 
 git:
   accessToken: ${Token}
