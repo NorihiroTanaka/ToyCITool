@@ -4,7 +4,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class JobMatcher:
+from .interfaces import IJobMatcher
+
+class JobMatcher(IJobMatcher):
     """ジョブの実行条件を判定するクラス"""
 
     def match(self, job_config: Dict[str, Any], changed_files: Set[str]) -> bool:

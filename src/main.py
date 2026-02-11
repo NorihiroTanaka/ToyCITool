@@ -1,7 +1,8 @@
 import argparse
 import uvicorn
 import os
-from .core import load_config
+from .core.config import Settings
+from .core.logging_config import setup_logging
 
 if __name__ == "__main__":
     if not os.path.exists("log"):
@@ -12,12 +13,19 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--port", help="Port to bind to", type=int, default=None)
     args = parser.parse_args()
 
-    config = load_config()
-    server_conf = config.get("server", {})
+    # 初期設定ロード (Settingsクラスを使用)
+    settings = Settings.load()
+    
+    # ログ設定がファイルに依存している場合の互換性維持、またはSettingsから取得するように改修
+    # ここでは既存の setup_logging を呼び出す（logging.yamlがあれば使う）
+    setup_logging()
 
-    host = args.address if args.address else server_conf.get("host", "0.0.0.0")
-    port = args.port if args.port else server_conf.get("port", 8000)
+    host = args.address if args.address else settings.server.host
+    port = args.port if args.port else settings.server.port
 
+    print(f"Starting server at http://{host}:{port}")
+
+    # uvicornのlog_config引数は、logging.yamlが存在する場合のみ指定する
     if os.path.exists("logging.yaml"):
         uvicorn.run("src.api:app", host=host, port=port, reload=True, log_config="logging.yaml")
     else:

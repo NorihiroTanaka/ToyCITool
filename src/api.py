@@ -4,17 +4,23 @@ import yaml
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, BackgroundTasks
-from .core import load_config
-from .core.job_service import JobService
-from .core.webhook_handler import WebhookProviderFactory
-from .core.job_trigger import JobTriggerService
 from .core.logging_config import setup_logging
+
+from .core.container import get_container
+from .core.webhook_factory import WebhookProviderFactory
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Load logging configuration
     setup_logging()
+    
+    # Initialize container
+    container = get_container()
+    app.state.container = container
+    
+    logger.info("Application started with configuration loaded.")
     yield
+    logger.info("Application shutdown.")
 
 logger = logging.getLogger(__name__)
 app = FastAPI(lifespan=lifespan)
@@ -29,13 +35,16 @@ async def webhook(request: Request, background_tasks: BackgroundTasks):
         return {"status": "error", "message": "Invalid JSON payload"}
 
     # Get provider based on headers (fallback to GitHub if not found)
-    # request.headers is a Headers object, convert to dict for type safety
     provider = WebhookProviderFactory.get_provider(dict(request.headers))
     logger.info(f"プロバイダーを使用: {provider.get_provider_id()}")
     
-    # Use JobTriggerService to handle logic
-    job_service = JobService()
-    service = JobTriggerService(load_config, job_service.run_job)
-    triggered_jobs = service.process_webhook_event(provider, payload, background_tasks)
-            
-    return {"status": "ok", "triggered_jobs": triggered_jobs}
+    # Use JobTriggerService from container to handle logic
+    container = request.app.state.container
+    service = container.job_trigger_service
+    
+    try:
+        triggered_jobs = service.process_webhook_event(provider, payload, background_tasks)
+        return {"status": "ok", "triggered_jobs": triggered_jobs}
+    except Exception as e:
+        logger.exception(f"Webhook processing failed: {e}")
+        return {"status": "error", "message": "Internal Server Error"}

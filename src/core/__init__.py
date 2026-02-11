@@ -1,11 +1,12 @@
 import logging
 from typing import Dict, Any, Optional, Type
 
-from .config_loader import load_config, ConfigLoader
 from .workspace_manager import WorkspaceManager
-from .vcs_handler import GitHandler, IVcsHandler
-from .job_executor import ShellJobExecutor, IJobExecutor
+from .vcs_handler import GitHandler
+from .job_executor import ShellJobExecutor
 from .job_service import JobService
+from .interfaces import IVcsHandler, IJobExecutor
+from .container import get_container
 
 # ロガーの設定 (必要に応じて親モジュールで設定することを推奨)
 logger = logging.getLogger(__name__)
@@ -28,5 +29,7 @@ def run_job(
         vcs_handler_cls (Type[IVcsHandler]): VCS操作クラス。デフォルトは GitHandler。
         job_executor_cls (Type[IJobExecutor]): ジョブ実行クラス。デフォルトは ShellJobExecutor。
     """
-    service = JobService(workspace_manager, vcs_handler_cls, job_executor_cls)
+    # 互換性維持のため、ContainerからデフォルトのSettingsを取得して渡す
+    container = get_container()
+    service = JobService(container.settings, workspace_manager, vcs_handler_cls, job_executor_cls)
     service.run_job(job, commit_info)

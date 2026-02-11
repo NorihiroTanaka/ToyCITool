@@ -5,10 +5,7 @@ from abc import ABC, abstractmethod
 
 logger = logging.getLogger(__name__)
 
-class IJobExecutor(ABC):
-    @abstractmethod
-    def execute(self, script: str, cwd: str) -> None:
-        pass
+from .interfaces import IJobExecutor
 
 class ShellJobExecutor(IJobExecutor):
     def execute(self, script: str, cwd: str) -> None:

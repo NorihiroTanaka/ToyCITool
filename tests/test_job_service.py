@@ -7,20 +7,14 @@ from src.core.job_service import JobService
 from src.core.vcs_handler import GitHandler
 from src.core.job_executor import ShellJobExecutor
 from src.core.workspace_manager import WorkspaceManager
-
-# テスト用の JobService サブクラス (設定ローダーをモックしやすくするため)
-class TestableJobService(JobService):
-    def __init__(self, config, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.config = config
+from src.core.config import Settings, GitConfig
 
 @pytest.fixture
-def mock_config():
-    return {
-        "git": {
-            "accessToken": "test_token"
-        }
-    }
+def mock_settings():
+    settings = Settings(
+        git=GitConfig(accessToken="test_token", repo_url="https://github.com/example/default.git")
+    )
+    return settings
 
 @pytest.fixture
 def mock_workspace_manager():
@@ -51,9 +45,9 @@ def mock_job_executor_cls(mock_job_executor):
     cls.return_value = mock_job_executor
     return cls
 
-def test_job_service_run_job_success(mock_config, mock_workspace_manager, mock_vcs_handler_cls, mock_job_executor_cls, mock_vcs_handler, mock_job_executor):
-    service = TestableJobService(
-        config=mock_config,
+def test_job_service_run_job_success(mock_settings, mock_workspace_manager, mock_vcs_handler_cls, mock_job_executor_cls, mock_vcs_handler, mock_job_executor):
+    service = JobService(
+        settings=mock_settings,
         workspace_manager=mock_workspace_manager,
         vcs_handler_cls=mock_vcs_handler_cls,
         job_executor_cls=mock_job_executor_cls
@@ -76,12 +70,12 @@ def test_job_service_run_job_success(mock_config, mock_workspace_manager, mock_v
     mock_job_executor.execute.assert_called_once_with("echo 'hello'", "/tmp/test_workspace")
     mock_workspace_manager.cleanup_workspace.assert_called_once_with("test_job")
 
-def test_job_service_run_job_with_changes(mock_config, mock_workspace_manager, mock_vcs_handler_cls, mock_job_executor_cls, mock_vcs_handler):
+def test_job_service_run_job_with_changes(mock_settings, mock_workspace_manager, mock_vcs_handler_cls, mock_job_executor_cls, mock_vcs_handler):
     # 変更がある場合のモック設定
     mock_vcs_handler.has_changes.return_value = True
     
-    service = TestableJobService(
-        config=mock_config,
+    service = JobService(
+        settings=mock_settings,
         workspace_manager=mock_workspace_manager,
         vcs_handler_cls=mock_vcs_handler_cls,
         job_executor_cls=mock_job_executor_cls
@@ -103,15 +97,15 @@ def test_job_service_run_job_with_changes(mock_config, mock_workspace_manager, m
     assert "abc" in args[0]  # メッセージにコミットIDが含まれているか
     assert "develop" == args[1] # ブランチ名が正しいか
 
-def test_job_service_validation_error(mock_config):
-    service = TestableJobService(config=mock_config)
+def test_job_service_validation_error(mock_settings):
+    service = JobService(settings=mock_settings)
     
-    # 必須パラメータ欠損
+    # 必須パラメータ欠損 (scriptがない)
     job_info = {
         "name": "invalid_job",
-        # "repo_url" is missing
+        "repo_url": "http://example.com",
         "target_branch": "main",
-        "script": "ls"
+        # "script" is missing
     }
     commit_info = {}
 

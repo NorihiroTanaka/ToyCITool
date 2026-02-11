@@ -4,31 +4,7 @@ from typing import Set, Dict, Any, Optional, List
 
 logger = logging.getLogger(__name__)
 
-class WebhookProvider(ABC):
-    @abstractmethod
-    def get_provider_id(self) -> str:
-        """プロバイダー識別子を取得する"""
-        pass
-
-    @abstractmethod
-    def should_skip(self, payload: Dict[str, Any]) -> bool:
-        """このペイロードに基づいて処理をスキップすべきか判定する"""
-        pass
-
-    @abstractmethod
-    def can_handle(self, headers: Dict[str, str]) -> bool:
-        """このプロバイダーがリクエストを処理できるか判定する"""
-        pass
-
-    @abstractmethod
-    def extract_changed_files(self, payload: Dict[str, Any]) -> Set[str]:
-        """ペイロードから変更されたファイルのリストを抽出する"""
-        pass
-    
-    @abstractmethod
-    def get_payload_meta(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """ジョブ実行に必要なメタデータを抽出する"""
-        pass
+from .interfaces import WebhookProvider
 
 class GitHubProvider(WebhookProvider):
     def get_provider_id(self) -> str:
@@ -62,21 +38,4 @@ class GitHubProvider(WebhookProvider):
         commits = payload.get("commits", [])
         return commits[-1] if commits else {}
 
-class WebhookProviderFactory:
-    _providers: List[WebhookProvider] = [
-        GitHubProvider(),
-    ]
-
-    @classmethod
-    def get_provider(cls, headers: Dict[str, str]) -> WebhookProvider:
-        """
-        リクエストヘッダーに基づいて適切なプロバイダーを返す。
-        マッチしない場合はデフォルト（GitHub）を返す。
-        """
-        for provider in cls._providers:
-            if provider.can_handle(headers):
-                return provider
-        
-        # フォールバック: GitHub
-        logger.info("ヘッダーに一致するプロバイダーが見つかりませんでした。GitHubProvider にフォールバックします。")
-        return cls._providers[0]
+# WebhookProviderFactory は src/core/webhook_factory.py に移動しました

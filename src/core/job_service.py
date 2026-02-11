@@ -1,56 +1,57 @@
 from typing import Dict, Any, Optional, Type
 import logging
-from .config_loader import load_config
+from .config import Settings
 from .workspace_manager import WorkspaceManager
-from .vcs_handler import GitHandler, IVcsHandler
-from .job_executor import ShellJobExecutor, IJobExecutor
+from .vcs_handler import GitHandler
+from .job_executor import ShellJobExecutor
+from .interfaces import IJobService, IVcsHandler, IJobExecutor
 
 logger = logging.getLogger(__name__)
 
-class JobService:
+class JobService(IJobService):
     def __init__(
         self,
+        settings: Settings,
         workspace_manager: Optional[WorkspaceManager] = None,
         vcs_handler_cls: Type[IVcsHandler] = GitHandler,
         job_executor_cls: Type[IJobExecutor] = ShellJobExecutor
     ):
+        self.settings = settings
         self.workspace_manager = workspace_manager or WorkspaceManager()
         self.vcs_handler_cls = vcs_handler_cls
         self.job_executor_cls = job_executor_cls
-        
-        # 全体設定の読み込み (アクセストークン取得のため)
-        # TODO: これもDIするか、Service初期化時に渡すようにするとより良い
-        self.config = load_config()
 
-    def run_job(self, job: Dict[str, Any], commit_info: Dict[str, Any]) -> None:
+    def run_job(self, job_config: Dict[str, Any], commit_info: Dict[str, Any]) -> None:
         """
         CIジョブを実行する一連のフローを制御します。
 
         Args:
-            job (Dict[str, Any]): ジョブの設定情報 (name, repo_url, target_branch, script)。
+            job_config (Dict[str, Any]): ジョブの設定情報 (name, repo_url, target_branch, script)。
             commit_info (Dict[str, Any]): トリガーとなったコミット情報 (id, modified)。
         """
-        job_name = job.get("name", "unknown_job")
-        repo_url = job.get("repo_url")
-        target_branch = job.get("target_branch")
-        script = job.get("script")
+        # settingsからデフォルト値を補完しつつ、job_configを使用する
+        job_name = job_config.get("name", "unknown_job")
         
-        # Pylance対応: 型チェックと変数の再定義
+        # job_configになければ、settings.git.repo_url を使うフォールバックロジックも検討可能だが、
+        # job定義には必須項目として扱うのが自然。ただし、GitConfig全体設定があるならそれを使うのもあり。
+        repo_url = job_config.get("repo_url") or self.settings.git.repo_url
+        target_branch = job_config.get("target_branch")
+        script = job_config.get("script")
+        
         if not repo_url or not target_branch or not script:
              logger.error(f"[{job_name}] 設定が無効です: repo_url, target_branch, script は必須です。")
              return
 
-        # ここで型が str であることは保証される
-        repo_url_str: str = repo_url
-        target_branch_str: str = target_branch
-        script_str: str = script
+        # Pylance/MyPy type narrowing
+        repo_url_str: str = str(repo_url)
+        target_branch_str: str = str(target_branch)
+        script_str: str = str(script)
 
         try:
             # 1. Workspace Preparation
             work_dir = self._prepare_workspace(job_name)
             
             # 2. VCS Operations & 3. Job Execution & 4. Result Handling
-            # work_dir が必要なので、これらのステップは try ブロック内で実行
             try:
                 vcs_handler = self._checkout_code(job_name, work_dir, repo_url_str, target_branch_str)
                 self._execute_script(job_name, work_dir, script_str)
@@ -71,8 +72,7 @@ class JobService:
             raise
 
     def _checkout_code(self, job_name: str, work_dir: str, repo_url: str, target_branch: str) -> IVcsHandler:
-        git_config = self.config.get("git", {})
-        access_token = git_config.get("accessToken")
+        access_token = self.settings.git.accessToken
         
         vcs_handler = self.vcs_handler_cls(work_dir)
         logger.info(f"[{job_name}] リポジトリを準備中: {repo_url} ({target_branch})")

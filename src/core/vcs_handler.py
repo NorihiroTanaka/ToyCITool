@@ -6,26 +6,7 @@ from .vcs_utils import inject_auth_token, mask_auth_token
 
 logger = logging.getLogger(__name__)
 
-class IVcsHandler(ABC):
-    @abstractmethod
-    def __init__(self, workspace_path: str):
-        pass
-
-    @abstractmethod
-    def prepare_repository(self, url: str, branch: str, access_token: Optional[str] = None) -> None:
-        pass
-    
-    @abstractmethod
-    def has_changes(self) -> bool:
-        pass
-
-    @abstractmethod
-    def commit_and_push(self, message: str, branch: str) -> None:
-        pass
-
-    @abstractmethod
-    def repo_close(self) -> None:
-        pass
+from .interfaces import IVcsHandler
 
 class GitHandler(IVcsHandler):
     def __init__(self, workspace_path: str):
