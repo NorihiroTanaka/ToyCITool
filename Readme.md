@@ -12,6 +12,10 @@
 - **スクリプト実行**: 条件に一致した場合、任意のシェルスクリプトを実行します。
 - **自動Push**: スクリプト実行によってワークスペース内で発生した変更を検知し、自動的に指定されたターゲットブランチへコミット＆プッシュします。
     - ターゲットブランチが存在しない場合、リモートから取得するか、新規に作成します。
+- **Windowsサービス対応**: WinSWを使用してWindowsサービスとして実行可能です。
+    - システム起動時の自動起動
+    - バックグラウンド実行
+    - サービスとしての管理（停止・再起動など）
 
 ## 必要要件
 
@@ -110,6 +114,48 @@ jobs:
 3. Gitサーバー（GitHubやGitLab、Giteaなど）のWebHook設定で、このサーバーのURL (`http://<your-server>:8000/webhook`) を登録します。
     - Content Type は `application/json` を選択してください。
 4. 監視対象のファイルを変更してPushすると、自動的にスクリプトが実行され、結果が指定ブランチにPushされます。
+
+## Windowsサービスとしての実行
+
+ToyCIToolをWindowsサービスとして実行することで、システム起動時の自動起動やバックグラウンド実行が可能になります。
+
+### クイックスタート
+
+1. **WinSWのダウンロード**
+   - [WinSWのリリースページ](https://github.com/winsw/winsw/releases)から `WinSW-x64.exe` をダウンロード
+   - `ToyCITool.exe` にリネームしてプロジェクトルートに配置
+
+2. **設定ファイルの編集**
+   - `ToyCITool.xml` を編集
+   - Pythonのパス、作業ディレクトリ、Gitアクセストークンを設定
+
+3. **サービスの登録と起動**
+   ```cmd
+   # 管理者権限でコマンドプロンプトを開く
+   cd /d f:\Project\ToyCITool
+   ToyCITool.exe install
+   ToyCITool.exe start
+   ```
+
+### 詳細なドキュメント
+
+- **[Windowsサービス実行ガイド](docs/windows_service.md)**: WinSWのインストール、設定、トラブルシューティング
+- **[テスト手順書](docs/service_testing.md)**: サービス化前後のテスト方法
+
+### 重要な注意事項
+
+Windowsサービスとして実行する場合、以下の点に注意してください：
+
+1. **環境変数の設定**: `.env` ファイルは使用されません。`ToyCITool.xml` で環境変数を設定してください。
+   ```xml
+   <env name="GIT_ACCESS_TOKEN" value="your_token_here"/>
+   ```
+
+2. **Git認証**: Git Credential Managerは使用できません。アクセストークンを明示的に設定する必要があります。
+
+3. **作業ディレクトリ**: 絶対パスで指定してください。
+
+詳細は [docs/windows_service.md](docs/windows_service.md) を参照してください。
 
 ## 環境変数
 

@@ -2,3 +2,10 @@
 __pycache__*
 log/*
 .env
+
+# WinSW関連ファイル
+ToyCITool.exe
+ToyCITool.xml
+*.log
+*.wrapper.log
+workspace/*
