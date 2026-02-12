@@ -12,9 +12,15 @@ class GitHandler(IVcsHandler):
     def __init__(self, workspace_path: str):
         self.workspace_path = workspace_path
         self.repo = None
+        self.access_token: Optional[str] = None  # 認証トークンを保持
+        self.original_url: Optional[str] = None  # 元のURLを保持
 
     def prepare_repository(self, url: str, branch: str, access_token: Optional[str] = None) -> None:
         """リポジトリをクローンし、指定ブランチをチェックアウトする"""
+        
+        # 認証情報を保存（push時に使用）
+        self.access_token = access_token
+        self.original_url = url
         
         # access_token が None の場合の対応を inject_auth_token 側でやってくれることを期待するか、ここで空文字を渡すか
         token_str = access_token if access_token else ""
@@ -27,6 +33,12 @@ class GitHandler(IVcsHandler):
             logger.info(f"{url} を {self.workspace_path} にクローンしています...")
 
         self.repo = Repo.clone_from(auth_url, self.workspace_path)
+        
+        # remote URLを認証付きURLに明示的に設定（push時の認証を確実にする）
+        if access_token:
+            origin = self.repo.remote(name='origin')
+            origin.set_url(auth_url)
+            logger.debug(f"Remote URL を認証付きURLに設定しました")
         
         # ターゲットブランチをチェックアウト
         if branch in self.repo.heads:
@@ -60,6 +72,13 @@ class GitHandler(IVcsHandler):
         # Add [skip ci] prefix to the commit message to prevent CI loops
         full_message = f"[skip ci] {message}"
         self.repo.index.commit(full_message)
+        
+        # push前にremote URLを認証付きURLに更新（Windowsサービス環境での認証を確実にする）
+        if self.access_token and self.original_url:
+            auth_url = inject_auth_token(self.original_url, self.access_token)
+            origin = self.repo.remote(name='origin')
+            origin.set_url(auth_url)
+            logger.debug(f"Push前にremote URLを認証付きURLに更新しました")
         
         logger.info(f"{branch} へ変更をプッシュしています...")
         origin = self.repo.remote(name='origin')
