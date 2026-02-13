@@ -12,7 +12,7 @@ class GitHubProvider(WebhookProvider):
 
     def should_skip(self, payload: Dict[str, Any]) -> bool:
         message = payload.get("head_commit", {}).get("message", "").lower()
-        return "ci skip" in message or "[ci skip]" in message
+        return "skip ci" in message or "[skip ci]" in message
 
     def can_handle(self, headers: Dict[str, str]) -> bool:
         # ヘッダーキーの大文字小文字を無視してチェック
