@@ -165,6 +165,53 @@ def test_job_service_ci_env_overrides_user_env(mock_settings, mock_workspace_man
     assert env["CI_BRANCH"] == "main"
 
 
+def test_job_service_passes_job_timeout_to_executor(mock_settings, mock_workspace_manager, mock_vcs_handler_cls, mock_job_executor_cls, mock_vcs_handler, mock_job_executor):
+    """ジョブ固有のtimeoutがexecutorに渡されること"""
+    service = JobService(
+        settings=mock_settings,
+        workspace_manager=mock_workspace_manager,
+        vcs_handler_cls=mock_vcs_handler_cls,
+        job_executor_cls=mock_job_executor_cls
+    )
+
+    job_info = {
+        "name": "timeout_test",
+        "repo_url": "https://github.com/example/repo.git",
+        "target_branch": "main",
+        "script": "echo 'hello'",
+        "timeout": 600,
+    }
+    commit_info = {"id": "123", "modified": []}
+
+    service.run_job(job_info, commit_info)
+
+    call_kwargs = mock_job_executor.execute.call_args
+    assert call_kwargs[1]["timeout_seconds"] == 600
+
+
+def test_job_service_uses_default_timeout_when_job_has_no_timeout(mock_settings, mock_workspace_manager, mock_vcs_handler_cls, mock_job_executor_cls, mock_vcs_handler, mock_job_executor):
+    """ジョブにtimeoutが未設定の場合、default_timeoutが使われること"""
+    service = JobService(
+        settings=mock_settings,
+        workspace_manager=mock_workspace_manager,
+        vcs_handler_cls=mock_vcs_handler_cls,
+        job_executor_cls=mock_job_executor_cls
+    )
+
+    job_info = {
+        "name": "no_timeout_test",
+        "repo_url": "https://github.com/example/repo.git",
+        "target_branch": "main",
+        "script": "echo 'hello'",
+    }
+    commit_info = {"id": "123", "modified": []}
+
+    service.run_job(job_info, commit_info)
+
+    call_kwargs = mock_job_executor.execute.call_args
+    assert call_kwargs[1]["timeout_seconds"] == mock_settings.default_timeout
+
+
 def test_job_service_validation_error(mock_settings):
     service = JobService(settings=mock_settings)
 

@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.core.config import GitConfig, Settings
+from src.core.config import GitConfig, JobConfig, Settings
 
 
 class TestGitConfig:
@@ -25,3 +25,27 @@ class TestGitConfig:
         config = GitConfig(access_token="token", repo_url="https://example.com/repo.git")
         assert config.repo_url == "https://example.com/repo.git"
         assert config.access_token == "token"
+
+
+class TestJobConfigTimeout:
+    """JobConfigのtimeoutフィールドテスト。"""
+
+    def test_timeoutのデフォルトはNone(self):
+        config = JobConfig(name="test", script="echo hi")
+        assert config.timeout is None
+
+    def test_timeoutを設定できる(self):
+        config = JobConfig(name="test", script="echo hi", timeout=600)
+        assert config.timeout == 600
+
+
+class TestSettingsDefaultTimeout:
+    """Settingsのdefault_timeoutフィールドテスト。"""
+
+    def test_default_timeoutのデフォルトは3600(self):
+        settings = Settings()
+        assert settings.default_timeout == 3600
+
+    def test_default_timeoutを設定できる(self):
+        settings = Settings(default_timeout=1800)
+        assert settings.default_timeout == 1800

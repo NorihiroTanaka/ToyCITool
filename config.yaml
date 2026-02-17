@@ -1,4 +1,6 @@
 # CI Tool Configuration
+default_timeout: 3600  # デフォルトのジョブタイムアウト（秒）
+
 server:
   workspace: "workspace"
 

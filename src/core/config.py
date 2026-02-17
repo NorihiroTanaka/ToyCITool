@@ -22,11 +22,13 @@ class JobConfig(BaseModel):
     script: str
     watch_files: List[str] = Field(default_factory=list)
     env: Dict[str, str] = Field(default_factory=dict)
+    timeout: Optional[int] = None
 
 class Settings(BaseModel):
     server: ServerConfig = Field(default_factory=ServerConfig)
     git: GitConfig = Field(default_factory=GitConfig)
     jobs: List[JobConfig] = Field(default_factory=list)
+    default_timeout: int = 3600
     
     @classmethod
     def load(cls, config_path: Optional[str] = None) -> "Settings":

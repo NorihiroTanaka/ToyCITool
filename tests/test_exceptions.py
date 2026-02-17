@@ -5,6 +5,7 @@ import pytest
 from src.core.exceptions import (
     ToyCIError,
     ScriptExecutionError,
+    JobTimeoutError,
     RepositoryError,
     RepositoryNotInitializedError,
     WorkspaceError,
@@ -21,6 +22,7 @@ class TestExceptionHierarchy:
         "exc_cls",
         [
             ScriptExecutionError,
+            JobTimeoutError,
             RepositoryError,
             RepositoryNotInitializedError,
             WorkspaceError,
@@ -41,9 +43,13 @@ class TestExceptionHierarchy:
     def test_全てのカスタム例外はExceptionを継承する(self):
         assert issubclass(ToyCIError, Exception)
 
+    def test_JobTimeoutErrorはScriptExecutionErrorを継承する(self):
+        assert issubclass(JobTimeoutError, ScriptExecutionError)
+
     def test_exceptToyCIErrorで全てのカスタム例外を捕捉できる(self):
         exceptions = [
             ScriptExecutionError("test"),
+            JobTimeoutError("test"),
             RepositoryError("test"),
             RepositoryNotInitializedError("test"),
             WorkspaceError("test"),
@@ -81,3 +87,24 @@ class TestScriptExecutionError:
     def test_メッセージがstrで取得できる(self):
         exc = ScriptExecutionError("テストメッセージ")
         assert str(exc) == "テストメッセージ"
+
+
+class TestJobTimeoutError:
+    """JobTimeoutErrorの属性テスト。"""
+
+    def test_デフォルト属性値(self):
+        exc = JobTimeoutError("タイムアウト")
+        assert str(exc) == "タイムアウト"
+        assert exc.timeout_seconds == 0
+        assert exc.return_code == -1
+        assert exc.stdout == ""
+        assert exc.stderr == ""
+
+    def test_カスタム属性値(self):
+        exc = JobTimeoutError(
+            "タイムアウト",
+            stdout="partial output",
+            timeout_seconds=300,
+        )
+        assert exc.stdout == "partial output"
+        assert exc.timeout_seconds == 300

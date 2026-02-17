@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock, mock_open
 import pytest
 
 from src.core.job_executor import ShellJobExecutor
-from src.core.exceptions import ScriptExecutionError
+from src.core.exceptions import ScriptExecutionError, JobTimeoutError
 
 
 class TestShellJobExecutor:
@@ -151,3 +151,65 @@ class TestShellJobExecutor:
         assert process_env["MY_VAR"] == "value"
         # ベースのホスト変数も含まれていること
         assert process_env["HOME"] == "/home/user"
+
+    @patch("src.core.job_executor.subprocess.Popen")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("src.core.job_executor.os.makedirs")
+    def test_タイムアウト設定ありで正常終了(self, mock_makedirs, mock_file_open, mock_popen):
+        mock_popen.return_value = self._make_mock_process(
+            ["line1\n"], returncode=0
+        )
+
+        self.executor.execute("echo hello", "/tmp", job_name="test", timeout_seconds=60)
+
+    @patch("src.core.job_executor.subprocess.Popen")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("src.core.job_executor.os.makedirs")
+    def test_タイムアウトなしで従来通り動作する(self, mock_makedirs, mock_file_open, mock_popen):
+        mock_popen.return_value = self._make_mock_process(
+            ["line1\n"], returncode=0
+        )
+
+        self.executor.execute("echo hello", "/tmp", job_name="test", timeout_seconds=None)
+
+    @patch("src.core.job_executor.threading.Timer")
+    @patch("src.core.job_executor.subprocess.Popen")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("src.core.job_executor.os.makedirs")
+    def test_タイムアウト時にJobTimeoutErrorが発生する(
+        self, mock_makedirs, mock_file_open, mock_popen, mock_timer_cls
+    ):
+        mock_process = self._make_mock_process(["partial\n"], returncode=-1)
+        mock_popen.return_value = mock_process
+
+        def capture_and_fire(timeout, callback):
+            timer_mock = MagicMock()
+            def start_side_effect():
+                callback()
+            timer_mock.start = start_side_effect
+            timer_mock.cancel = MagicMock()
+            timer_mock.daemon = True
+            return timer_mock
+        mock_timer_cls.side_effect = capture_and_fire
+
+        with pytest.raises(JobTimeoutError) as exc_info:
+            self.executor.execute("long_script", "/tmp", job_name="timeout_job", timeout_seconds=10)
+
+        assert exc_info.value.timeout_seconds == 10
+        assert "タイムアウト" in str(exc_info.value)
+
+    @patch("src.core.job_executor.threading.Timer")
+    @patch("src.core.job_executor.subprocess.Popen")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("src.core.job_executor.os.makedirs")
+    def test_正常終了時にタイマーがキャンセルされる(
+        self, mock_makedirs, mock_file_open, mock_popen, mock_timer_cls
+    ):
+        mock_popen.return_value = self._make_mock_process(["ok\n"], returncode=0)
+
+        mock_timer = MagicMock()
+        mock_timer_cls.return_value = mock_timer
+
+        self.executor.execute("echo ok", "/tmp", job_name="test", timeout_seconds=60)
+
+        mock_timer.cancel.assert_called_once()

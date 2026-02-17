@@ -57,6 +57,25 @@ class JobValidationError(ToyCIError):
     pass
 
 
+class JobTimeoutError(ScriptExecutionError):
+    """ジョブのタイムアウトによるエラー。
+
+    Attributes:
+        timeout_seconds: タイムアウト値（秒）
+    """
+
+    def __init__(
+        self,
+        message: str,
+        stdout: str = "",
+        stderr: str = "",
+        return_code: int = -1,
+        timeout_seconds: int = 0,
+    ) -> None:
+        super().__init__(message, stdout=stdout, stderr=stderr, return_code=return_code)
+        self.timeout_seconds = timeout_seconds
+
+
 class WebhookPayloadError(ToyCIError):
     """Webhookペイロードの解析エラー。"""
     pass
