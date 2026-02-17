@@ -84,7 +84,7 @@ class JobService(IJobService):
     def _execute_script(self, job_name: str, work_dir: str, script: str) -> None:
         logger.info(f"[{job_name}] スクリプトを実行中: {script}")
         executor = self.job_executor_cls()
-        executor.execute(script, work_dir)
+        executor.execute(script, work_dir, job_name=job_name)
 
     def _handle_result(self, job_name: str, vcs_handler: IVcsHandler, commit_info: Dict[str, Any], target_branch: str) -> None:
         if vcs_handler.has_changes():

@@ -3,7 +3,7 @@ from typing import Dict, Any, List, Set, Optional
 
 class IJobExecutor(ABC):
     @abstractmethod
-    def execute(self, script: str, cwd: str) -> None:
+    def execute(self, script: str, cwd: str, job_name: str = "unknown") -> None:
         pass
 
 class IVcsHandler(ABC):

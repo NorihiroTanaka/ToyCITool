@@ -68,7 +68,7 @@ def test_job_service_run_job_success(mock_settings, mock_workspace_manager, mock
     mock_workspace_manager.prepare_workspace.assert_called_once_with("test_job")
     mock_vcs_handler_cls.assert_called_once_with("/tmp/test_workspace")
     mock_vcs_handler.prepare_repository.assert_called_once()
-    mock_job_executor.execute.assert_called_once_with("echo 'hello'", "/tmp/test_workspace")
+    mock_job_executor.execute.assert_called_once_with("echo 'hello'", "/tmp/test_workspace", job_name="test_job")
     mock_workspace_manager.cleanup_workspace.assert_called_once_with("test_job")
 
 def test_job_service_run_job_with_changes(mock_settings, mock_workspace_manager, mock_vcs_handler_cls, mock_job_executor_cls, mock_vcs_handler):
