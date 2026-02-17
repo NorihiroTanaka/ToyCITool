@@ -1,7 +1,7 @@
 from typing import List, Optional, Dict, Any
 import os
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from dotenv import load_dotenv
 
 class ServerConfig(BaseModel):
@@ -10,8 +10,10 @@ class ServerConfig(BaseModel):
     workspace: str = "./workspace"
 
 class GitConfig(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     repo_url: Optional[str] = None
-    accessToken: Optional[str] = None
+    access_token: Optional[str] = Field(None, alias="accessToken")
 
 class JobConfig(BaseModel):
     name: str

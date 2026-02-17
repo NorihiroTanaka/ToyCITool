@@ -1,10 +1,12 @@
 from typing import Dict, Any, Optional, Type
 import logging
+
 from .config import Settings
 from .workspace_manager import WorkspaceManager
 from .vcs_handler import GitHandler
 from .job_executor import ShellJobExecutor
 from .interfaces import IJobService, IVcsHandler, IJobExecutor
+from .exceptions import ToyCIError, JobValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +41,10 @@ class JobService(IJobService):
         script = job_config.get("script")
         
         if not repo_url or not target_branch or not script:
-             logger.error(f"[{job_name}] 設定が無効です: repo_url, target_branch, script は必須です。")
-             return
+            raise JobValidationError(
+                f"[{job_name}] repo_url, target_branch, script は必須です。"
+                f" repo_url={repo_url}, target_branch={target_branch}, script={script}"
+            )
 
         # Pylance/MyPy type narrowing
         repo_url_str: str = str(repo_url)
@@ -48,23 +52,18 @@ class JobService(IJobService):
         script_str: str = str(script)
 
         try:
-            # 1. Workspace Preparation
             work_dir = self._prepare_workspace(job_name)
-            
-            # 2. VCS Operations & 3. Job Execution & 4. Result Handling
-            vcs_handler = None  # finallyブロックで参照できるよう初期化
             try:
-                vcs_handler = self._checkout_code(job_name, work_dir, repo_url_str, target_branch_str)
-                self._execute_script(job_name, work_dir, script_str)
-                self._handle_result(job_name, vcs_handler, commit_info, target_branch_str)
+                with self._checkout_code(job_name, work_dir, repo_url_str, target_branch_str) as vcs_handler:
+                    self._execute_script(job_name, work_dir, script_str)
+                    self._handle_result(job_name, vcs_handler, commit_info, target_branch_str)
             finally:
-                if vcs_handler:
-                    vcs_handler.close()
-                # 5. Cleanup Workspace (エラーがあっても必ず実行)
                 self._cleanup_workspace(job_name)
 
-        except Exception as e:
+        except ToyCIError as e:
             logger.exception(f"[{job_name}] ジョブが失敗しました: {e}")
+        except Exception as e:
+            logger.exception(f"[{job_name}] 予期しないエラーが発生しました: {e}")
 
     def _prepare_workspace(self, job_name: str) -> str:
         logger.info(f"[{job_name}] ワークスペースを準備中...")
@@ -75,7 +74,7 @@ class JobService(IJobService):
             raise
 
     def _checkout_code(self, job_name: str, work_dir: str, repo_url: str, target_branch: str) -> IVcsHandler:
-        access_token = self.settings.git.accessToken
+        access_token = self.settings.git.access_token
         
         vcs_handler = self.vcs_handler_cls(work_dir)
         logger.info(f"[{job_name}] リポジトリを準備中: {repo_url} ({target_branch})")

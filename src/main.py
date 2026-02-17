@@ -17,9 +17,6 @@ def print_default_config():
     print(yaml.dump(config_dict, sort_keys=False))
 
 if __name__ == "__main__":
-    if not os.path.exists("log"):
-        os.makedirs("log")
-
     parser = argparse.ArgumentParser(description="ToyCI Server")
     parser.add_argument("-a", "--address", help="Host address to bind to", default=None)
     parser.add_argument("-p", "--port", help="Port to bind to", type=int, default=None)

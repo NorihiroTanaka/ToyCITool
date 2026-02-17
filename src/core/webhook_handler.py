@@ -1,10 +1,9 @@
 import logging
-from abc import ABC, abstractmethod
-from typing import Set, Dict, Any, Optional, List
-
-logger = logging.getLogger(__name__)
+from typing import Set, Dict, Any
 
 from .interfaces import WebhookProvider
+
+logger = logging.getLogger(__name__)
 
 class GitHubProvider(WebhookProvider):
     def get_provider_id(self) -> str:
@@ -37,5 +36,3 @@ class GitHubProvider(WebhookProvider):
         """
         commits = payload.get("commits", [])
         return commits[-1] if commits else {}
-
-# WebhookProviderFactory は src/core/webhook_factory.py に移動しました

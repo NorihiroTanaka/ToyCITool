@@ -1,18 +1,16 @@
-import os
-import shutil
-import tempfile
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from src.core.job_service import JobService
 from src.core.vcs_handler import GitHandler
 from src.core.job_executor import ShellJobExecutor
 from src.core.workspace_manager import WorkspaceManager
 from src.core.config import Settings, GitConfig
+from src.core.exceptions import JobValidationError
 
 @pytest.fixture
 def mock_settings():
     settings = Settings(
-        git=GitConfig(accessToken="test_token", repo_url="https://github.com/example/default.git")
+        git=GitConfig(access_token="test_token", repo_url="https://github.com/example/default.git")
     )
     return settings
 
@@ -26,6 +24,9 @@ def mock_workspace_manager():
 def mock_vcs_handler():
     handler = MagicMock(spec=GitHandler)
     handler.has_changes.return_value = False
+    # コンテキストマネージャで自身を返すように設定
+    handler.__enter__ = MagicMock(return_value=handler)
+    handler.__exit__ = MagicMock(return_value=False)
     return handler
 
 @pytest.fixture
@@ -99,7 +100,7 @@ def test_job_service_run_job_with_changes(mock_settings, mock_workspace_manager,
 
 def test_job_service_validation_error(mock_settings):
     service = JobService(settings=mock_settings)
-    
+
     # 必須パラメータ欠損 (scriptがない)
     job_info = {
         "name": "invalid_job",
@@ -109,6 +110,6 @@ def test_job_service_validation_error(mock_settings):
     }
     commit_info = {}
 
-    # エラーにならずにreturnされることを確認（ログ出力のみ）
-    service.run_job(job_info, commit_info)
-    # ここではログの検証は省略するが、例外が飛ばないことを確認
+    # JobValidationErrorが発生することを確認
+    with pytest.raises(JobValidationError):
+        service.run_job(job_info, commit_info)

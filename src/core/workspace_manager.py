@@ -1,9 +1,19 @@
-import os, stat
+import os
+import stat
 import shutil
 import time
 import logging
 
+from .exceptions import WorkspaceError, WorkspaceCleanupError
+
 logger = logging.getLogger(__name__)
+
+_MAX_CLEANUP_RETRIES: int = 3
+"""ワークスペース削除のリトライ最大回数。"""
+
+_CLEANUP_RETRY_DELAY_SEC: float = 1.0
+"""ワークスペース削除リトライ時の待機秒数。"""
+
 
 class WorkspaceManager:
     def __init__(self, base_dir: str = "./workspace"):
@@ -22,7 +32,7 @@ class WorkspaceManager:
             try:
                 shutil.rmtree(work_dir, onexc=self.remove_readonly)
             except Exception as e:
-                raise Exception(f"Failed to clean workspace: {e}")
+                raise WorkspaceError(f"ワークスペースの初期化に失敗しました: {e}") from e
                 
         os.makedirs(work_dir, exist_ok=True)
         return work_dir
@@ -32,14 +42,14 @@ class WorkspaceManager:
         work_dir = os.path.join(self.base_dir, job_name)
         
         if os.path.exists(work_dir):
-            for i in range(3): # 最大3回リトライ
+            for i in range(_MAX_CLEANUP_RETRIES):
                 try:
                     shutil.rmtree(work_dir, onexc=self.remove_readonly)
                     logger.info(f"ワークスペース {work_dir} を削除しました。")
                     return
                 except Exception as e:
-                    logger.warning(f"ワークスペースの削除に失敗しました (試行 {i+1}/3): {e}")
-                    time.sleep(1) # 1秒待機
+                    logger.warning(f"ワークスペースの削除に失敗しました (試行 {i+1}/{_MAX_CLEANUP_RETRIES}): {e}")
+                    time.sleep(_CLEANUP_RETRY_DELAY_SEC)
             
             logger.error(f"ワークスペース {work_dir} の削除に最終的に失敗しました。")
-            raise Exception(f"Failed to clean workspace after multiple retries.")
+            raise WorkspaceCleanupError(f"ワークスペースの削除にリトライ後も失敗しました: {work_dir}")
