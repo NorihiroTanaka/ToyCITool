@@ -1,5 +1,6 @@
 from typing import Dict, Any, Optional, Type
 import logging
+import uuid
 
 from .config import Settings
 from .workspace_manager import WorkspaceManager
@@ -51,11 +52,24 @@ class JobService(IJobService):
         target_branch_str: str = str(target_branch)
         script_str: str = str(script)
 
+        # ユーザー定義の環境変数
+        user_env: Dict[str, str] = job_config.get("env", {})
+
         try:
             work_dir = self._prepare_workspace(job_name)
             try:
+                ci_env = self._build_ci_env(
+                    job_name=job_name,
+                    commit_info=commit_info,
+                    repo_url=repo_url_str,
+                    branch=target_branch_str,
+                    workspace=work_dir,
+                )
+                # ユーザー定義 → CI メタデータの順でマージ（CI 変数が優先）
+                env = {**user_env, **ci_env}
+
                 with self._checkout_code(job_name, work_dir, repo_url_str, target_branch_str) as vcs_handler:
-                    self._execute_script(job_name, work_dir, script_str)
+                    self._execute_script(job_name, work_dir, script_str, env)
                     self._handle_result(job_name, vcs_handler, commit_info, target_branch_str)
             finally:
                 self._cleanup_workspace(job_name)
@@ -81,10 +95,27 @@ class JobService(IJobService):
         vcs_handler.prepare_repository(repo_url, target_branch, access_token)
         return vcs_handler
 
-    def _execute_script(self, job_name: str, work_dir: str, script: str) -> None:
+    def _build_ci_env(
+        self,
+        job_name: str,
+        commit_info: Dict[str, Any],
+        repo_url: str,
+        branch: str,
+        workspace: str,
+    ) -> Dict[str, str]:
+        """CI メタデータ環境変数を構築する"""
+        return {
+            "CI_JOB_ID": f"{job_name}-{uuid.uuid4().hex[:8]}",
+            "CI_COMMIT_HASH": str(commit_info.get("id", "")),
+            "CI_BRANCH": branch,
+            "CI_REPO_URL": repo_url,
+            "CI_WORKSPACE": workspace,
+        }
+
+    def _execute_script(self, job_name: str, work_dir: str, script: str, env: Optional[Dict[str, str]] = None) -> None:
         logger.info(f"[{job_name}] スクリプトを実行中: {script}")
         executor = self.job_executor_cls()
-        executor.execute(script, work_dir, job_name=job_name)
+        executor.execute(script, work_dir, job_name=job_name, env=env)
 
     def _handle_result(self, job_name: str, vcs_handler: IVcsHandler, commit_info: Dict[str, Any], target_branch: str) -> None:
         if vcs_handler.has_changes():

@@ -21,6 +21,7 @@ class JobConfig(BaseModel):
     target_branch: Optional[str] = None
     script: str
     watch_files: List[str] = Field(default_factory=list)
+    env: Dict[str, str] = Field(default_factory=dict)
 
 class Settings(BaseModel):
     server: ServerConfig = Field(default_factory=ServerConfig)

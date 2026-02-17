@@ -68,7 +68,18 @@ def test_job_service_run_job_success(mock_settings, mock_workspace_manager, mock
     mock_workspace_manager.prepare_workspace.assert_called_once_with("test_job")
     mock_vcs_handler_cls.assert_called_once_with("/tmp/test_workspace")
     mock_vcs_handler.prepare_repository.assert_called_once()
-    mock_job_executor.execute.assert_called_once_with("echo 'hello'", "/tmp/test_workspace", job_name="test_job")
+    mock_job_executor.execute.assert_called_once()
+    call_kwargs = mock_job_executor.execute.call_args
+    assert call_kwargs[0][0] == "echo 'hello'"
+    assert call_kwargs[0][1] == "/tmp/test_workspace"
+    assert call_kwargs[1]["job_name"] == "test_job"
+    # env引数が渡されていること
+    env = call_kwargs[1]["env"]
+    assert "CI_JOB_ID" in env
+    assert env["CI_COMMIT_HASH"] == "123"
+    assert env["CI_BRANCH"] == "main"
+    assert env["CI_REPO_URL"] == "https://github.com/example/repo.git"
+    assert env["CI_WORKSPACE"] == "/tmp/test_workspace"
     mock_workspace_manager.cleanup_workspace.assert_called_once_with("test_job")
 
 def test_job_service_run_job_with_changes(mock_settings, mock_workspace_manager, mock_vcs_handler_cls, mock_job_executor_cls, mock_vcs_handler):
@@ -97,6 +108,62 @@ def test_job_service_run_job_with_changes(mock_settings, mock_workspace_manager,
     args, _ = mock_vcs_handler.commit_and_push.call_args
     assert "abc" in args[0]  # メッセージにコミットIDが含まれているか
     assert "develop" == args[1] # ブランチ名が正しいか
+
+def test_job_service_user_env_merged_with_ci_env(mock_settings, mock_workspace_manager, mock_vcs_handler_cls, mock_job_executor_cls, mock_vcs_handler, mock_job_executor):
+    """ユーザー定義の環境変数がCI変数とマージされること"""
+    service = JobService(
+        settings=mock_settings,
+        workspace_manager=mock_workspace_manager,
+        vcs_handler_cls=mock_vcs_handler_cls,
+        job_executor_cls=mock_job_executor_cls
+    )
+
+    job_info = {
+        "name": "env_test_job",
+        "repo_url": "https://github.com/example/repo.git",
+        "target_branch": "develop",
+        "script": "echo 'test'",
+        "env": {"MY_VAR": "my_value", "BUILD_TYPE": "release"},
+    }
+    commit_info = {"id": "def456", "modified": ["file.py"]}
+
+    service.run_job(job_info, commit_info)
+
+    call_kwargs = mock_job_executor.execute.call_args
+    env = call_kwargs[1]["env"]
+    # ユーザー定義変数が含まれていること
+    assert env["MY_VAR"] == "my_value"
+    assert env["BUILD_TYPE"] == "release"
+    # CI変数も含まれていること
+    assert env["CI_COMMIT_HASH"] == "def456"
+    assert env["CI_BRANCH"] == "develop"
+
+
+def test_job_service_ci_env_overrides_user_env(mock_settings, mock_workspace_manager, mock_vcs_handler_cls, mock_job_executor_cls, mock_vcs_handler, mock_job_executor):
+    """CI変数がユーザー定義の同名変数を上書きすること"""
+    service = JobService(
+        settings=mock_settings,
+        workspace_manager=mock_workspace_manager,
+        vcs_handler_cls=mock_vcs_handler_cls,
+        job_executor_cls=mock_job_executor_cls
+    )
+
+    job_info = {
+        "name": "override_test",
+        "repo_url": "https://github.com/example/repo.git",
+        "target_branch": "main",
+        "script": "echo 'test'",
+        "env": {"CI_BRANCH": "user_branch"},  # CI変数名と衝突
+    }
+    commit_info = {"id": "abc123", "modified": []}
+
+    service.run_job(job_info, commit_info)
+
+    call_kwargs = mock_job_executor.execute.call_args
+    env = call_kwargs[1]["env"]
+    # CI変数が優先されること
+    assert env["CI_BRANCH"] == "main"
+
 
 def test_job_service_validation_error(mock_settings):
     service = JobService(settings=mock_settings)

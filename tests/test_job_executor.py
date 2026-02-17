@@ -103,3 +103,51 @@ class TestShellJobExecutor:
         message = str(exc_info.value)
         assert "output text" in message
         assert exc_info.value.return_code == 2
+
+    @patch("src.core.job_executor.subprocess.Popen")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("src.core.job_executor.os.makedirs")
+    def test_env引数がsubprocessに渡される(self, mock_makedirs, mock_file_open, mock_popen):
+        mock_popen.return_value = self._make_mock_process([], returncode=0)
+
+        env = {"CI_BRANCH": "main", "CI_COMMIT_HASH": "abc123"}
+        self.executor.execute("echo test", "/tmp", job_name="env_job", env=env)
+
+        call_kwargs = mock_popen.call_args[1]
+        # env引数がPopenに渡されていること
+        assert "env" in call_kwargs
+        process_env = call_kwargs["env"]
+        # CI変数がマージされていること
+        assert process_env["CI_BRANCH"] == "main"
+        assert process_env["CI_COMMIT_HASH"] == "abc123"
+
+    @patch("src.core.job_executor.subprocess.Popen")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("src.core.job_executor.os.makedirs")
+    def test_envがNoneでもホスト環境変数が渡される(self, mock_makedirs, mock_file_open, mock_popen):
+        mock_popen.return_value = self._make_mock_process([], returncode=0)
+
+        self.executor.execute("echo test", "/tmp", job_name="no_env_job", env=None)
+
+        call_kwargs = mock_popen.call_args[1]
+        assert "env" in call_kwargs
+        # ホスト環境変数のPATHなどが含まれていること
+        assert "PATH" in call_kwargs["env"] or "Path" in call_kwargs["env"]
+
+    @patch("src.core.job_executor.os.environ", {"PATH": "/usr/bin", "HOME": "/home/user"})
+    @patch("src.core.job_executor.subprocess.Popen")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("src.core.job_executor.os.makedirs")
+    def test_envがホスト環境変数を上書きできる(self, mock_makedirs, mock_file_open, mock_popen):
+        mock_popen.return_value = self._make_mock_process([], returncode=0)
+
+        env = {"PATH": "/custom/bin", "MY_VAR": "value"}
+        self.executor.execute("echo test", "/tmp", job_name="override_job", env=env)
+
+        call_kwargs = mock_popen.call_args[1]
+        process_env = call_kwargs["env"]
+        # 渡した値で上書きされていること
+        assert process_env["PATH"] == "/custom/bin"
+        assert process_env["MY_VAR"] == "value"
+        # ベースのホスト変数も含まれていること
+        assert process_env["HOME"] == "/home/user"

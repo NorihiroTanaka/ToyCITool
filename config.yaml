@@ -13,3 +13,6 @@ jobs:
       - "requirements.txt"
     script: "scripts\\build.cmd"
     target_branch: "main"
+    env:
+      PYTHON_ENV: "ci"
+      # BUILD_TYPE: "release"

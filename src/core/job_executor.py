@@ -2,6 +2,7 @@ import subprocess
 import logging
 import os
 from datetime import datetime
+from typing import Optional, Dict
 
 from .interfaces import IJobExecutor
 from .exceptions import ScriptExecutionError
@@ -22,12 +23,20 @@ class ShellJobExecutor(IJobExecutor):
         filename = f"{job_name}_{timestamp}.log"
         return os.path.join(self.job_log_dir, filename)
 
-    def execute(self, script: str, cwd: str, job_name: str = "unknown") -> None:
+    def _build_env(self, env: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+        """ホスト環境変数をベースに、追加の環境変数をマージした辞書を返す"""
+        merged = os.environ.copy()
+        if env:
+            merged.update(env)
+        return merged
+
+    def execute(self, script: str, cwd: str, job_name: str = "unknown", env: Optional[Dict[str, str]] = None) -> None:
         """シェルスクリプトをリアルタイムログ出力付きで実行する"""
         log_file_path = self._create_log_file_path(job_name)
         logger.info(f"[{job_name}] スクリプトを実行中: {script}")
         logger.info(f"[{job_name}] ジョブログ: {log_file_path}")
 
+        process_env = self._build_env(env)
         output_lines: list[str] = []
 
         try:
@@ -36,6 +45,7 @@ class ShellJobExecutor(IJobExecutor):
                     script,
                     shell=True,
                     cwd=cwd,
+                    env=process_env,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
