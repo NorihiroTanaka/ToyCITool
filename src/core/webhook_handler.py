@@ -36,3 +36,13 @@ class GitHubProvider(WebhookProvider):
         """
         commits = payload.get("commits", [])
         return commits[-1] if commits else {}
+
+    def extract_repo_info(self, payload: Dict[str, Any]) -> Dict[str, str] | None:
+        """GitHub ペイロードからリポジトリ URL とブランチを抽出する。"""
+        repo = payload.get("repository", {})
+        clone_url = repo.get("clone_url") or repo.get("html_url")
+        ref = payload.get("ref", "")
+        branch = ref.removeprefix("refs/heads/") if ref else ""
+        if not clone_url or not branch:
+            return None
+        return {"repo_url": clone_url, "branch": branch}

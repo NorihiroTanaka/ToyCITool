@@ -33,6 +33,21 @@ class JobConfig(BaseModel):
     timeout: Optional[int] = None
     venv: Optional[str] = None
 
+class RepoJobConfig(BaseModel):
+    """リポジトリ内の .toyci.yaml から読み込まれるジョブ設定。
+    repo_url / target_branch は Webhook ペイロードから自動補完される。
+    """
+    name: str
+    script: str
+    watch_files: List[str] = Field(default_factory=list)
+    env: Dict[str, str] = Field(default_factory=dict)
+    timeout: Optional[int] = None
+    venv: Optional[str] = None
+
+class RepoCISettings(BaseModel):
+    """リポジトリ内の CI 設定ファイル (.toyci.yaml) のトップレベル構造。"""
+    jobs: List[RepoJobConfig] = Field(default_factory=list)
+
 class Settings(BaseModel):
     server: ServerConfig = Field(default_factory=ServerConfig)
     git: GitConfig = Field(default_factory=GitConfig)

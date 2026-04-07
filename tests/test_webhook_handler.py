@@ -83,6 +83,47 @@ class TestGitHubProviderExtractChangedFiles:
         assert result == {"file.py"}
 
 
+class TestGitHubProviderExtractRepoInfo:
+    def setup_method(self):
+        self.provider = GitHubProvider()
+
+    def test_clone_urlとブランチが返る(self):
+        payload = {
+            "ref": "refs/heads/main",
+            "repository": {"clone_url": "https://github.com/owner/repo.git"},
+        }
+        result = self.provider.extract_repo_info(payload)
+        assert result == {
+            "repo_url": "https://github.com/owner/repo.git",
+            "branch": "main",
+        }
+
+    def test_clone_urlがない場合はhtml_urlにフォールバックする(self):
+        payload = {
+            "ref": "refs/heads/develop",
+            "repository": {"html_url": "https://github.com/owner/repo"},
+        }
+        result = self.provider.extract_repo_info(payload)
+        assert result["repo_url"] == "https://github.com/owner/repo"
+        assert result["branch"] == "develop"
+
+    def test_repositoryキーがない場合はNoneが返る(self):
+        payload = {"ref": "refs/heads/main"}
+        assert self.provider.extract_repo_info(payload) is None
+
+    def test_refキーがない場合はNoneが返る(self):
+        payload = {"repository": {"clone_url": "https://github.com/owner/repo.git"}}
+        assert self.provider.extract_repo_info(payload) is None
+
+    def test_refs_heads_プレフィックスが除去される(self):
+        payload = {
+            "ref": "refs/heads/feature/my-branch",
+            "repository": {"clone_url": "https://github.com/owner/repo.git"},
+        }
+        result = self.provider.extract_repo_info(payload)
+        assert result["branch"] == "feature/my-branch"
+
+
 class TestGitHubProviderGetPayloadMeta:
     def setup_method(self):
         self.provider = GitHubProvider()

@@ -68,3 +68,12 @@ class WebhookProvider(ABC):
     def get_payload_meta(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """ジョブ実行に必要なメタデータを抽出する"""
         pass
+
+    @abstractmethod
+    def extract_repo_info(self, payload: Dict[str, Any]) -> Optional[Dict[str, str]]:
+        """ペイロードからリポジトリ情報を抽出する。
+
+        Returns:
+            {"repo_url": str, "branch": str} または None（情報が取得できない場合）
+        """
+        pass
