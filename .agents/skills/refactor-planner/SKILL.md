@@ -63,18 +63,18 @@ description: >
 
 ### Step 3: 計画ファイルの出力
 
-計画を `plan/refactor/` ディレクトリに Markdown ファイルとして出力する。
+計画を `plans/refactor/` ディレクトリに Markdown ファイルとして出力する。
 
 **ファイル名の規則**:
 ```
-plan/refactor/<YYYY-MM-DD>-<対象モジュール名またはテーマ>.md
+plans/refactor/<YYYY-MM-DD>-<対象モジュール名またはテーマ>.md
 ```
 
 例:
-- `plan/refactor/2025-04-08-job-service-split.md`
-- `plan/refactor/2025-04-08-dependency-cleanup.md`
+- `plans/refactor/2025-04-08-job-service-split.md`
+- `plans/refactor/2025-04-08-dependency-cleanup.md`
 
-`plan/refactor/` ディレクトリが存在しない場合は作成する。
+`plans/refactor/` ディレクトリが存在しない場合は作成する。
 
 **計画ファイルのテンプレート**:
 
