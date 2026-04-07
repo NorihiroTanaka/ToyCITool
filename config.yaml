@@ -23,6 +23,7 @@ jobs:
       - "requirements.txt"
     script: "scripts\\build.cmd"
     target_branch: "main"
+    # venv: ".venv"  # Python仮想環境のパス（省略可）。相対パスはワークスペースからの相対、絶対パスも指定可能。
     env:
       PYTHON_ENV: "ci"
       # BUILD_TYPE: "release"

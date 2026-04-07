@@ -31,6 +31,7 @@ class JobConfig(BaseModel):
     watch_files: List[str] = Field(default_factory=list)
     env: Dict[str, str] = Field(default_factory=dict)
     timeout: Optional[int] = None
+    venv: Optional[str] = None
 
 class Settings(BaseModel):
     server: ServerConfig = Field(default_factory=ServerConfig)

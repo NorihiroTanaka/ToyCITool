@@ -117,6 +117,7 @@ class JobService(IJobService):
         script_str: str = str(script)
 
         user_env: Dict[str, str] = job_config.get("env", {})
+        venv_path: Optional[str] = job_config.get("venv")
 
         job_timeout = job_config.get("timeout")
         effective_timeout = job_timeout if job_timeout is not None else self.settings.default_timeout
@@ -137,7 +138,7 @@ class JobService(IJobService):
                     env = {**user_env, **ci_env}
 
                     with self._checkout_code(job_name, work_dir, repo_url_str, target_branch_str) as vcs_handler:
-                        self._execute_script(job_name, work_dir, script_str, env, timeout_seconds=effective_timeout)
+                        self._execute_script(job_name, work_dir, script_str, env, timeout_seconds=effective_timeout, venv=venv_path)
                         self._handle_result(job_name, vcs_handler, commit_info, target_branch_str)
                 finally:
                     self._cleanup_workspace(job_name)
@@ -192,10 +193,10 @@ class JobService(IJobService):
             "CI_WORKSPACE": workspace,
         }
 
-    def _execute_script(self, job_name: str, work_dir: str, script: str, env: Optional[Dict[str, str]] = None, timeout_seconds: Optional[int] = None) -> None:
+    def _execute_script(self, job_name: str, work_dir: str, script: str, env: Optional[Dict[str, str]] = None, timeout_seconds: Optional[int] = None, venv: Optional[str] = None) -> None:
         logger.info(f"[{job_name}] スクリプトを実行中: {script}")
         executor = self.job_executor_cls()
-        executor.execute(script, work_dir, job_name=job_name, env=env, timeout_seconds=timeout_seconds)
+        executor.execute(script, work_dir, job_name=job_name, env=env, timeout_seconds=timeout_seconds, venv=venv)
 
     def _handle_result(self, job_name: str, vcs_handler: IVcsHandler, commit_info: Dict[str, Any], target_branch: str) -> None:
         if vcs_handler.has_changes():

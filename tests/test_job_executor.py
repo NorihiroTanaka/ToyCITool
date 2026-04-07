@@ -1,6 +1,8 @@
 """ShellJobExecutorのテスト。"""
 
+import os
 import subprocess
+import sys
 from unittest.mock import patch, MagicMock, mock_open
 
 import pytest
@@ -213,3 +215,89 @@ class TestShellJobExecutor:
         self.executor.execute("echo ok", "/tmp", job_name="test", timeout_seconds=60)
 
         mock_timer.cancel.assert_called_once()
+
+
+class TestShellJobExecutorVenv:
+    """venvサポートのテスト。"""
+
+    def setup_method(self):
+        self.executor = ShellJobExecutor(job_log_dir="/tmp/test_log_jobs")
+
+    def _make_mock_process(self, stdout_lines, returncode):
+        mock_process = MagicMock()
+        mock_process.stdout = iter(stdout_lines)
+        mock_process.wait.return_value = returncode
+        mock_process.returncode = returncode
+        mock_process.poll.return_value = returncode
+        return mock_process
+
+    @patch("src.core.job_executor.subprocess.Popen")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("src.core.job_executor.os.makedirs")
+    def test_venv指定時にPATHの先頭にScriptsDirが追加される(self, mock_makedirs, mock_file_open, mock_popen):
+        mock_popen.return_value = self._make_mock_process([], returncode=0)
+
+        self.executor.execute("echo test", "/tmp", job_name="venv_job", venv="/path/to/venv")
+
+        call_kwargs = mock_popen.call_args[1]
+        process_env = call_kwargs["env"]
+        expected_scripts = os.path.join(
+            os.path.abspath("/path/to/venv"),
+            "Scripts" if sys.platform == "win32" else "bin",
+        )
+        assert process_env["PATH"].startswith(expected_scripts)
+
+    @patch("src.core.job_executor.subprocess.Popen")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("src.core.job_executor.os.makedirs")
+    def test_venv指定時にVIRTUAL_ENVが設定される(self, mock_makedirs, mock_file_open, mock_popen):
+        mock_popen.return_value = self._make_mock_process([], returncode=0)
+
+        self.executor.execute("echo test", "/tmp", job_name="venv_job", venv="/path/to/venv")
+
+        call_kwargs = mock_popen.call_args[1]
+        process_env = call_kwargs["env"]
+        assert process_env["VIRTUAL_ENV"] == os.path.abspath("/path/to/venv")
+
+    @patch("src.core.job_executor.os.environ", {"PATH": "/usr/bin", "PYTHONHOME": "/old/python"})
+    @patch("src.core.job_executor.subprocess.Popen")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("src.core.job_executor.os.makedirs")
+    def test_venv指定時にPYTHONHOMEが削除される(self, mock_makedirs, mock_file_open, mock_popen):
+        mock_popen.return_value = self._make_mock_process([], returncode=0)
+
+        self.executor.execute("echo test", "/tmp", job_name="venv_job", venv="/path/to/venv")
+
+        call_kwargs = mock_popen.call_args[1]
+        process_env = call_kwargs["env"]
+        assert "PYTHONHOME" not in process_env
+
+    @patch("src.core.job_executor.subprocess.Popen")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("src.core.job_executor.os.makedirs")
+    def test_venv未指定時は通常通りPATHが変更されない(self, mock_makedirs, mock_file_open, mock_popen):
+        mock_popen.return_value = self._make_mock_process([], returncode=0)
+
+        with patch("src.core.job_executor.os.environ", {"PATH": "/usr/bin"}):
+            self.executor.execute("echo test", "/tmp", job_name="no_venv_job")
+
+        call_kwargs = mock_popen.call_args[1]
+        process_env = call_kwargs["env"]
+        assert process_env.get("PATH") == "/usr/bin"
+        assert "VIRTUAL_ENV" not in process_env
+
+    @patch("src.core.job_executor.subprocess.Popen")
+    @patch("builtins.open", new_callable=mock_open)
+    @patch("src.core.job_executor.os.makedirs")
+    def test_venvとenv両方指定時にenvがvenvのPATHを上書きできる(self, mock_makedirs, mock_file_open, mock_popen):
+        mock_popen.return_value = self._make_mock_process([], returncode=0)
+
+        self.executor.execute(
+            "echo test", "/tmp", job_name="venv_env_job",
+            env={"PATH": "/custom/bin"},
+            venv="/path/to/venv",
+        )
+
+        call_kwargs = mock_popen.call_args[1]
+        process_env = call_kwargs["env"]
+        assert process_env["PATH"] == "/custom/bin"

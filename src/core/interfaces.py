@@ -3,7 +3,7 @@ from typing import Dict, Any, List, Set, Optional
 
 class IJobExecutor(ABC):
     @abstractmethod
-    def execute(self, script: str, cwd: str, job_name: str = "unknown", env: Optional[Dict[str, str]] = None, timeout_seconds: Optional[int] = None) -> None:
+    def execute(self, script: str, cwd: str, job_name: str = "unknown", env: Optional[Dict[str, str]] = None, timeout_seconds: Optional[int] = None, venv: Optional[str] = None) -> None:
         pass
 
 class IVcsHandler(ABC):

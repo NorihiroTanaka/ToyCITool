@@ -1,6 +1,7 @@
 import subprocess
 import logging
 import os
+import sys
 import threading
 from datetime import datetime
 from typing import Optional, Dict
@@ -24,9 +25,16 @@ class ShellJobExecutor(IJobExecutor):
         filename = f"{job_name}_{timestamp}.log"
         return os.path.join(self.job_log_dir, filename)
 
-    def _build_env(self, env: Optional[Dict[str, str]] = None) -> Dict[str, str]:
-        """ホスト環境変数をベースに、追加の環境変数をマージした辞書を返す"""
+    def _build_env(self, env: Optional[Dict[str, str]] = None, venv: Optional[str] = None) -> Dict[str, str]:
+        """ホスト環境変数をベースに、venvおよび追加の環境変数をマージした辞書を返す"""
         merged = os.environ.copy()
+        if venv:
+            venv_abs = os.path.abspath(venv)
+            scripts_dir = os.path.join(venv_abs, "Scripts" if sys.platform == "win32" else "bin")
+            current_path = merged.get("PATH", "")
+            merged["PATH"] = scripts_dir + os.pathsep + current_path
+            merged["VIRTUAL_ENV"] = venv_abs
+            merged.pop("PYTHONHOME", None)
         if env:
             merged.update(env)
         return merged
@@ -48,15 +56,17 @@ class ShellJobExecutor(IJobExecutor):
         except OSError:
             pass
 
-    def execute(self, script: str, cwd: str, job_name: str = "unknown", env: Optional[Dict[str, str]] = None, timeout_seconds: Optional[int] = None) -> None:
+    def execute(self, script: str, cwd: str, job_name: str = "unknown", env: Optional[Dict[str, str]] = None, timeout_seconds: Optional[int] = None, venv: Optional[str] = None) -> None:
         """シェルスクリプトをリアルタイムログ出力付きで実行する"""
         log_file_path = self._create_log_file_path(job_name)
         logger.info(f"[{job_name}] スクリプトを実行中: {script}")
         logger.info(f"[{job_name}] ジョブログ: {log_file_path}")
+        if venv is not None:
+            logger.info(f"[{job_name}] Python venv: {os.path.abspath(venv)}")
         if timeout_seconds is not None:
             logger.info(f"[{job_name}] タイムアウト: {timeout_seconds}秒")
 
-        process_env = self._build_env(env)
+        process_env = self._build_env(env, venv)
         output_lines: list[str] = []
         timed_out = threading.Event()
         timer: Optional[threading.Timer] = None
