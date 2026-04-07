@@ -195,7 +195,7 @@ class JobService(IJobService):
 
     def _execute_script(self, job_name: str, work_dir: str, script: str, env: Optional[Dict[str, str]] = None, timeout_seconds: Optional[int] = None, venv: Optional[str] = None) -> None:
         logger.info(f"[{job_name}] スクリプトを実行中: {script}")
-        executor = self.job_executor_cls()
+        executor = self.job_executor_cls(self.settings.job_log_dir)
         executor.execute(script, work_dir, job_name=job_name, env=env, timeout_seconds=timeout_seconds, venv=venv)
 
     def _handle_result(self, job_name: str, vcs_handler: IVcsHandler, commit_info: Dict[str, Any], target_branch: str) -> None:

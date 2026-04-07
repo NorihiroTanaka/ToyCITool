@@ -23,26 +23,23 @@ class GitConfig(BaseModel):
     repo_url: Optional[str] = None
     access_token: Optional[str] = Field(None, alias="accessToken")
 
-class JobConfig(BaseModel):
+class BaseJobConfig(BaseModel):
+    """ジョブ設定の共通フィールド。"""
     name: str
-    repo_url: Optional[str] = None
-    target_branch: Optional[str] = None
     script: str
     watch_files: List[str] = Field(default_factory=list)
     env: Dict[str, str] = Field(default_factory=dict)
     timeout: Optional[int] = None
     venv: Optional[str] = None
 
-class RepoJobConfig(BaseModel):
+class JobConfig(BaseJobConfig):
+    repo_url: Optional[str] = None
+    target_branch: Optional[str] = None
+
+class RepoJobConfig(BaseJobConfig):
     """リポジトリ内の .toyci.yaml から読み込まれるジョブ設定。
     repo_url / target_branch は Webhook ペイロードから自動補完される。
     """
-    name: str
-    script: str
-    watch_files: List[str] = Field(default_factory=list)
-    env: Dict[str, str] = Field(default_factory=dict)
-    timeout: Optional[int] = None
-    venv: Optional[str] = None
 
 class RepoCISettings(BaseModel):
     """リポジトリ内の CI 設定ファイル (.toyci.yaml) のトップレベル構造。"""
@@ -55,6 +52,7 @@ class Settings(BaseModel):
     notifications: Optional[NotificationsConfig] = None
     default_timeout: int = 3600
     max_concurrent_jobs: int = 1
+    job_log_dir: str = "log/jobs"
 
     @classmethod
     def load(cls, config_path: Optional[str] = None) -> "Settings":

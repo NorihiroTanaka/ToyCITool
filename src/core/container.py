@@ -5,6 +5,7 @@ from .job_service import JobService
 from .job_trigger import JobTriggerService
 from .job_matcher import JobMatcher
 from .webhook_factory import WebhookProviderFactory
+from .workspace_manager import WorkspaceManager
 from .interfaces import IJobService
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,10 @@ class Container:
     @property
     def job_service(self) -> IJobService:
         if self._job_service is None:
-            self._job_service = JobService(self.settings)
+            self._job_service = JobService(
+                self.settings,
+                workspace_manager=WorkspaceManager(self.settings.server.workspace),
+            )
         return self._job_service
 
     @property

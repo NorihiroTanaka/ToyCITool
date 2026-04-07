@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List, Set, Optional
+from typing import Any, Dict, List, Optional, Set
 
 class IJobExecutor(ABC):
     @abstractmethod
@@ -10,7 +10,7 @@ class IVcsHandler(ABC):
     @abstractmethod
     def prepare_repository(self, url: str, branch: str, access_token: Optional[str] = None) -> None:
         pass
-    
+
     @abstractmethod
     def has_changes(self) -> bool:
         pass
@@ -22,6 +22,12 @@ class IVcsHandler(ABC):
     @abstractmethod
     def close(self) -> None:
         pass
+
+    def __enter__(self) -> "IVcsHandler":
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        self.close()
 
 class IJobService(ABC):
     @abstractmethod

@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Optional
+from typing import Optional
 
 from git import Repo
 
@@ -53,19 +53,6 @@ class GitHandler(IVcsHandler):
         if self.repo:
             self.repo.close()
             self.repo = None
-
-    def __enter__(self) -> "GitHandler":
-        """コンテキストマネージャのエントリー。"""
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: Any,
-    ) -> None:
-        """コンテキストマネージャのクリーンアップ。"""
-        self.close()
 
     # --- プライベートメソッド ---
 
