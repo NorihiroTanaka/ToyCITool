@@ -1,7 +1,27 @@
+import hmac
+import hashlib
 import logging
 from typing import Set, Dict, Any
 
 from .interfaces import WebhookProvider
+
+
+def verify_github_signature(body: bytes, secret: str, signature_header: str) -> bool:
+    """GitHub Webhookのリクエスト署名をHMAC-SHA256で検証する。
+
+    Args:
+        body: リクエストのRawボディ
+        secret: Webhookシークレット文字列
+        signature_header: リクエストの X-Hub-Signature-256 ヘッダー値
+
+    Returns:
+        署名が正当であればTrue、そうでなければFalse
+    """
+    if not signature_header.startswith("sha256="):
+        return False
+    expected_digest = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    actual_digest = signature_header[len("sha256="):]
+    return hmac.compare_digest(expected_digest, actual_digest)
 
 logger = logging.getLogger(__name__)
 

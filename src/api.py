@@ -3,10 +3,12 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 from .core.logging_config import setup_logging
 from .core.container import get_container
 from .core.webhook_factory import WebhookProviderFactory
+from .core.webhook_handler import verify_github_signature
 from .core.exceptions import ToyCIError
 
 logger = logging.getLogger(__name__)
@@ -30,8 +32,21 @@ app = FastAPI(lifespan=lifespan)
 @app.post("/webhook")
 async def webhook(request: Request):
     """Webhookを受け取り、ジョブをキューに追加する"""
+    body = await request.body()
+
+    container = request.app.state.container
+    webhook_secret = container.settings.server.webhook_secret
+
+    if webhook_secret:
+        signature_header = request.headers.get("x-hub-signature-256", "")
+        client_host = request.client.host if request.client else "unknown"
+        if not verify_github_signature(body, webhook_secret, signature_header):
+            logger.warning(f"Webhook署名検証失敗: リモートIP={client_host}")
+            return JSONResponse(status_code=403, content={"status": "error", "message": "Invalid signature"})
+        logger.info(f"Webhook署名検証成功: リモートIP={client_host}")
+
     try:
-        payload = await request.json()
+        payload = json.loads(body)
     except (json.JSONDecodeError, ValueError) as e:
         logger.error(f"JSONペイロードの解析エラー: {e}")
         return {"status": "error", "message": "Invalid JSON payload"}
@@ -39,7 +54,6 @@ async def webhook(request: Request):
     provider = WebhookProviderFactory.get_provider(dict(request.headers))
     logger.info(f"プロバイダーを使用: {provider.get_provider_id()}")
 
-    container = request.app.state.container
     service = container.job_trigger_service
 
     try:
