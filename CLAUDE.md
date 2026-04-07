@@ -30,28 +30,7 @@ python -m src.main --print-default-config
 
 ## プロジェクト構成
 
-```
-src/
-  main.py              # エントリーポイント（CLI）
-  api.py               # FastAPIアプリ（/webhook エンドポイント）
-  core/
-    config.py           # Pydantic設定モデル（環境変数展開対応）
-    container.py        # DIコンテナ（シングルトン）
-    interfaces.py       # 抽象基底クラス（ABC）
-    job_service.py      # ジョブ実行オーケストレーション
-    job_trigger.py      # Webhookイベント処理
-    job_matcher.py      # ファイルパターンマッチング
-    webhook_handler.py  # WebhookProvider実装
-    webhook_factory.py  # プロバイダファクトリ
-    vcs_handler.py      # Git操作（GitPythonラッパー）
-    job_executor.py     # シェルスクリプト実行
-    workspace_manager.py # ワークスペース管理
-    notifier.py         # 通知（Discord対応）
-    repo_ci_config_loader.py # リポジトリ内.toyci.yaml読込
-    exceptions.py       # カスタム例外
-tests/                  # pytestテストスイート
-config.yaml             # ジョブ設定
-```
+プロジェクト構成・アーキテクチャの確認は `.agents/skills/project-structure/SKILL.md` のスキルを使用すること。
 
 ## 開発規約
 
@@ -65,19 +44,30 @@ config.yaml             # ジョブ設定
 - **宣言的記述**: リスト内包表記、`map`/`filter`、高階関数を活用
 
 ### 開発フロー（TDD）
-1. **シグネチャ設計**: 関数名・型・Docstringを先に定義（`pass`で仮実装）
-2. **テスト実装**: 正常系・異常系・境界値のテストを先に書く（Red）
-3. **実装**: テストを通す最小限のコードを書く（Green → Refactor）
+
+「TDDで実装して」「テスト駆動で作って」「テストファーストで開発して」などTDDを求める指示があった場合は、`.agents/skills/tdd-workflow/SKILL.md` のワークフローに従って開発すること。
+
+タスクの粒度が大きい（複数ステップが必要、複数ファイルにまたがるなど）と判断した場合は、`.agents/skills/task-splitter/SKILL.md` の使用を検討すること。
 
 ### テスト規約
+
+tdd-workflow スキル経由でテストを書く場合も含め、以下の規約に準拠すること:
 - AAA（Arrange-Act-Assert）パターン厳守
 - テスト間の独立性を保つ（共有状態禁止）
 - 外部依存はモックで分離
 
 ### リファクタリング
-- 振る舞いを保存する（機能追加・バグ修正と同時に行わない）
-- テストがグリーンの状態から開始し、小さな変更を繰り返す
-- 単一責任原則・低結合・高凝集を目指す
+
+リファクタリング・設計改善・コード整理を行う場合は、`.agents/skills/refactor-planner/SKILL.md` のスキルを使用すること。
+
+## スキル活用ガイド
+
+| 状況 | 使用するスキル |
+|------|---------------|
+| プロジェクト構成・アーキテクチャを確認したい | `.agents/skills/project-structure/SKILL.md` |
+| タスクをサブタスクに分割したい（粒度が大きい場合） | `.agents/skills/task-splitter/SKILL.md` |
+| TDD（テスト駆動開発）で実装したい | `.agents/skills/tdd-workflow/SKILL.md` |
+| リファクタリング・設計改善・コード整理をしたい | `.agents/skills/refactor-planner/SKILL.md` |
 
 ## 設計パターン
 - **DI（依存性注入）**: `Container`クラスでサービスインスタンス管理
