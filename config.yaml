@@ -8,6 +8,13 @@ server:
 git:
   accessToken: ${GIT_ACCESS_TOKEN}
 
+# 通知設定（オプション）。設定しない場合は通知は行われない。
+# notifications:
+#   discord:
+#     webhook_url: ${DISCORD_WEBHOOK_URL}
+#     on_success: true   # 成功時に通知する（デフォルト: true）
+#     on_failure: true   # 失敗時に通知する（デフォルト: true）
+
 jobs:
   - name: "Example"
     repo_url: ${GIT_REPO_URL}

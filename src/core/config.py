@@ -9,6 +9,14 @@ class ServerConfig(BaseModel):
     port: int = 8000
     workspace: str = "./workspace"
 
+class DiscordNotificationConfig(BaseModel):
+    webhook_url: str = ""
+    on_success: bool = True
+    on_failure: bool = True
+
+class NotificationsConfig(BaseModel):
+    discord: Optional[DiscordNotificationConfig] = None
+
 class GitConfig(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -28,6 +36,7 @@ class Settings(BaseModel):
     server: ServerConfig = Field(default_factory=ServerConfig)
     git: GitConfig = Field(default_factory=GitConfig)
     jobs: List[JobConfig] = Field(default_factory=list)
+    notifications: Optional[NotificationsConfig] = None
     default_timeout: int = 3600
     max_concurrent_jobs: int = 1
 

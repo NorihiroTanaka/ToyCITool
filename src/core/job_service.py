@@ -10,6 +10,7 @@ from .vcs_handler import GitHandler
 from .job_executor import ShellJobExecutor
 from .interfaces import IJobService, IVcsHandler, IJobExecutor
 from .exceptions import ToyCIError, JobValidationError
+from .notifier import Notifier, NotificationEvent, build_notifier
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,11 @@ class JobService(IJobService):
         self.workspace_manager = workspace_manager or WorkspaceManager()
         self.vcs_handler_cls = vcs_handler_cls
         self.job_executor_cls = job_executor_cls
+
+        notifications_raw = (
+            settings.notifications.model_dump() if settings.notifications else None
+        )
+        self._notifier: Notifier = build_notifier(notifications_raw)
 
         self._job_queue: queue.Queue[Optional[Tuple[Dict[str, Any], Dict[str, Any]]]] = queue.Queue()
         self._workers: List[threading.Thread] = []
@@ -115,6 +121,8 @@ class JobService(IJobService):
         job_timeout = job_config.get("timeout")
         effective_timeout = job_timeout if job_timeout is not None else self.settings.default_timeout
 
+        error_message: Optional[str] = None
+        success = False
         try:
             with self.workspace_manager.workspace_lock(job_name):
                 work_dir = self._prepare_workspace(job_name)
@@ -134,10 +142,22 @@ class JobService(IJobService):
                 finally:
                     self._cleanup_workspace(job_name)
 
+            success = True
+
         except ToyCIError as e:
+            error_message = str(e)
             logger.exception(f"[{job_name}] ジョブが失敗しました: {e}")
         except Exception as e:
+            error_message = str(e)
             logger.exception(f"[{job_name}] 予期しないエラーが発生しました: {e}")
+        finally:
+            self._send_notification(
+                job_name=job_name,
+                commit_info=commit_info,
+                branch=target_branch_str,
+                success=success,
+                error_message=error_message,
+            )
 
     def _prepare_workspace(self, job_name: str) -> str:
         logger.info(f"[{job_name}] ワークスペースを準備中...")
@@ -191,3 +211,24 @@ class JobService(IJobService):
 
     def _cleanup_workspace(self, job_name: str) -> None:
         self.workspace_manager.cleanup_workspace(job_name)
+
+    def _send_notification(
+        self,
+        job_name: str,
+        commit_info: Dict[str, Any],
+        branch: str,
+        success: bool,
+        error_message: Optional[str] = None,
+    ) -> None:
+        event = NotificationEvent(
+            job_name=job_name,
+            success=success,
+            branch=branch,
+            commit_hash=str(commit_info.get("id", "")),
+            commit_message=commit_info.get("message"),
+            error_message=error_message,
+        )
+        try:
+            self._notifier.notify(event)
+        except Exception as e:
+            logger.warning(f"[{job_name}] 通知の送信中にエラーが発生しました: {e}")
