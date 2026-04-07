@@ -6,9 +6,9 @@ ToyCI Serverが提供するREST APIのエンドポイント仕様です。
 
 APIは FastAPI フレームワークを使用して実装されており、以下の特徴があります：
 
-*   **Lifespan イベント**: アプリケーション起動時に DIコンテナを初期化し、設定を読み込みます。
+*   **Lifespan イベント**: アプリケーション起動時に DIコンテナを初期化し、終了時にジョブワーカーを安全に停止します。
 *   **Dependency Injection**: [`Container`](../src/core/container.py:1) を通じてサービスインスタンスを取得します。
-*   **非同期処理**: Webhookイベントの処理は `BackgroundTasks` を使用してバックグラウンドで実行されます。
+*   **非同期処理**: Webhookイベントの処理は内部ジョブキュー（ワーカースレッド）を使用してバックグラウンドで実行されます。
 
 ## エンドポイント
 
@@ -64,8 +64,9 @@ GitHubの場合、`commits` 配列や `head_commit` 情報が含まれます。
 3.  **スキップ判定**: プロバイダーの `should_skip()` メソッドでスキップ判定を行います（例: `[ci skip]` の検出）。
 4.  **変更ファイル抽出**: プロバイダーの `extract_changed_files()` メソッドで変更ファイルを抽出します。
 5.  **ジョブマッチング**: [`JobMatcher`](../src/core/job_matcher.py:1) が各ジョブの `watch_files` パターンと照合します。
-6.  **バックグラウンド実行**: マッチしたジョブを `BackgroundTasks` に追加し、非同期で実行します。
-7.  **レスポンス返却**: トリガーされたジョブ名のリストを即座に返します（ジョブの完了を待ちません）。
+6.  **リポジトリ内CI設定読込**: プロバイダーの `extract_repo_info()` でリポジトリ情報を抽出し、`.toyci.yaml` も読み込みます。
+7.  **キュー追加**: マッチしたジョブを内部ジョブキューに追加し、ワーカースレッドが非同期で実行します。
+8.  **レスポンス返却**: トリガーされたジョブ名のリストを即座に返します（ジョブの完了を待ちません）。
 
 #### レスポンス
 
@@ -159,7 +160,8 @@ async def lifespan(app: FastAPI):
     
     yield
     
-    # 終了時
+    # 終了時: 実行中のジョブが完了するまで待機してからシャットダウン
+    container.job_service.shutdown(wait=True)
     logger.info("Application shutdown.")
 ```
 
@@ -178,15 +180,16 @@ service = container.job_trigger_service
 *   **テスタビリティ**: モックやスタブに置き換えやすくなります。
 *   **依存関係の明確化**: サービス間の依存関係が明示的になります。
 
-### バックグラウンドタスク
+### ジョブキュー
 
-ジョブの実行は `BackgroundTasks` を使用して非同期で行われます。
+ジョブの実行は内部ジョブキュー（`queue.Queue`）とワーカースレッドで非同期に行われます。
 
 ```python
-background_tasks.add_task(self.job_service.run_job, job_dict, payload_meta)
+self.job_service.submit_job(job_dict, payload_meta)
 ```
 
-これにより、Webhookリクエストに対して即座にレスポンスを返すことができます。
+`max_concurrent_jobs` で同時実行数を制御します。キューに追加されたジョブはFIFO順で処理されます。
+Webhookリクエストに対して即座にレスポンスを返すことができます。
 
 ## セキュリティ考慮事項
 
@@ -207,7 +210,7 @@ CIツールが生成したコミットには自動的に `[skip ci]` が付与�
 ```python
 def should_skip(self, payload: Dict[str, Any]) -> bool:
     message = payload.get("head_commit", {}).get("message", "").lower()
-    return "ci skip" in message or "[ci skip]" in message
+    return "skip ci" in message or "[skip ci]" in message
 ```
 
 ## 使用例

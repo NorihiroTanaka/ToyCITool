@@ -10,8 +10,17 @@
     - その他のプロバイダーの場合も、デフォルトでGitHub互換として処理を試みます。
 - **ファイル監視**: WebHookペイロードに含まれる変更ファイル（追加・変更・削除）を抽出し、設定ファイルで指定したパターン（ワイルドカード対応）に一致する場合のみジョブを実行します。
 - **スクリプト実行**: 条件に一致した場合、任意のシェルスクリプトを実行します。
+    - **タイムアウト制御**: ジョブごとまたはグローバルでタイムアウトを設定できます。
+    - **Python venvサポート**: 仮想環境を指定してスクリプトを実行できます。
+    - **カスタム環境変数**: ジョブごとに環境変数を設定できます。
+    - **CI環境変数**: `CI_JOB_ID`、`CI_COMMIT_HASH`、`CI_BRANCH` 等の変数が自動的に注入されます。
+    - **ジョブログ**: ジョブごとのログが `log/jobs/` に保存されます。
 - **自動Push**: スクリプト実行によってワークスペース内で発生した変更を検知し、自動的に指定されたターゲットブランチへコミット＆プッシュします。
     - ターゲットブランチが存在しない場合、リモートから取得するか、新規に作成します。
+- **リポジトリ内CI設定**: トリガーされたリポジトリ内の `.toyci.yaml` を参照し、ジョブを実行できます。
+    - CI設定をCIサーバーではなく各リポジトリで管理できます。
+- **ジョブキュー**: 内部スレッドプールでジョブを管理します。`max_concurrent_jobs` で同時実行数を制御できます。
+- **Discord通知**: ジョブの成功・失敗をDiscord Webhookで通知できます。
 - **Windowsサービス対応**: WinSWを使用してWindowsサービスとして実行可能です。
     - システム起動時の自動起動
     - バックグラウンド実行
@@ -79,19 +88,35 @@
 server:
   host: "0.0.0.0"
   port: 8000
+  workspace: "workspace"
 
-# gitセクションは現状使用されていませんが、将来的な認証情報の一元管理等のために予約されています。
-# git:
-#   accessToken: ${Token}
+git:
+  accessToken: "${GIT_ACCESS_TOKEN}"
+
+# ジョブの同時実行数とタイムアウト（秒）
+max_concurrent_jobs: 1
+default_timeout: 3600
+job_log_dir: "log/jobs"
+
+# Discord通知（オプション）
+notifications:
+  discord:
+    webhook_url: "${DISCORD_WEBHOOK_URL}"
+    on_success: true
+    on_failure: true
 
 jobs:
   - name: "Example Build"
-    repo_url: "https://github.com/example/repo.git" # CI対象のリポジトリURL
+    repo_url: "https://github.com/example/repo.git"  # CI対象のリポジトリURL
     watch_files:
       - "src/*.py"       # 監視するファイルパターン (glob形式)
       - "requirements.txt"
-    script: "./scripts/build.sh" # 実行するスクリプト
-    target_branch: "build-output" # 変更をプッシュするブランチ名
+    script: "./scripts/build.sh"       # 実行するスクリプト
+    target_branch: "build-output"      # 変更をプッシュするブランチ名
+    timeout: 600                       # タイムアウト秒数（オプション）
+    venv: ".venv"                      # Python仮想環境パス（オプション）
+    env:                               # 追加の環境変数（オプション）
+      MY_VAR: "value"
 ```
 
 ### 設定項目
@@ -100,12 +125,54 @@ jobs:
 | --- | --- |
 | `server.host` | サーバーのホストアドレス (デフォルト: 0.0.0.0) |
 | `server.port` | サーバーのポート番号 (デフォルト: 8000) |
+| `server.workspace` | ジョブ実行用のワークスペースディレクトリ (デフォルト: ./workspace) |
+| `git.accessToken` | Gitリポジトリへのアクセストークン（環境変数参照推奨） |
+| `max_concurrent_jobs` | ジョブの同時実行数 (デフォルト: 1) |
+| `default_timeout` | デフォルトのジョブタイムアウト秒数 (デフォルト: 3600) |
+| `job_log_dir` | ジョブログの出力先ディレクトリ (デフォルト: log/jobs) |
+| `notifications.discord.webhook_url` | Discord通知先のWebhook URL |
+| `notifications.discord.on_success` | 成功時に通知するか (デフォルト: true) |
+| `notifications.discord.on_failure` | 失敗時に通知するか (デフォルト: true) |
 | `jobs` | 実行するジョブのリスト |
 | `jobs[].name` | ジョブの識別名 |
 | `jobs[].repo_url` | CI対象のリポジトリURL |
-| `jobs[].watch_files` | 変更を検知するファイルパターンのリスト。変更ファイルがこれにマッチするとジョブが走ります。 |
+| `jobs[].watch_files` | 変更を検知するファイルパターンのリスト |
 | `jobs[].script` | 実行するコマンドまたはスクリプトパス |
 | `jobs[].target_branch` | スクリプト実行後の変更をPushする先のブランチ名 |
+| `jobs[].timeout` | このジョブのタイムアウト秒数（省略時は `default_timeout` を使用） |
+| `jobs[].venv` | Python仮想環境のパス（省略可） |
+| `jobs[].env` | ジョブに追加する環境変数のマップ（省略可） |
+
+## リポジトリ内CI設定 (.toyci.yaml)
+
+CI設定をCIサーバー側の `config.yaml` だけでなく、各リポジトリ内の `.toyci.yaml` ファイルに記述できます。
+WebHookを受信すると、トリガーされたリポジトリをシャロークローンして `.toyci.yaml` を読み込み、定義されたジョブを実行します。
+
+```yaml
+# .toyci.yaml（リポジトリルートに配置）
+jobs:
+  - name: "test"
+    watch_files:
+      - "src/**/*.py"
+      - "tests/**/*.py"
+    script: |
+      pip install -r requirements.txt
+      pytest
+```
+
+`repo_url` と `target_branch` はWebHookペイロードから自動補完されます。
+
+## CI環境変数
+
+スクリプト実行時に以下の環境変数が自動的に注入されます。
+
+| 変数名 | 内容 |
+| --- | --- |
+| `CI_JOB_ID` | ジョブID（ジョブ名 + ランダムサフィックス） |
+| `CI_COMMIT_HASH` | トリガーとなったコミットのハッシュ |
+| `CI_BRANCH` | ブランチ名 |
+| `CI_REPO_URL` | リポジトリURL |
+| `CI_WORKSPACE` | ワークスペースの絶対パス |
 
 ## 使い方
 

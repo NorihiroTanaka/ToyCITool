@@ -13,6 +13,18 @@ server:
 git:
   accessToken: "${GIT_ACCESS_TOKEN}"  # 環境変数から読み込み
 
+# ジョブ実行の制御
+max_concurrent_jobs: 1       # 同時実行数 (デフォルト: 1)
+default_timeout: 3600        # デフォルトタイムアウト秒数 (デフォルト: 3600)
+job_log_dir: "log/jobs"      # ジョブログ出力先 (デフォルト: log/jobs)
+
+# Discord通知（オプション）
+notifications:
+  discord:
+    webhook_url: "${DISCORD_WEBHOOK_URL}"
+    on_success: true
+    on_failure: true
+
 jobs:
   - name: "example-job"
     repo_url: "https://github.com/user/repo.git"
@@ -24,6 +36,10 @@ jobs:
     script: |
       pip install -r requirements.txt
       python run_tests.py
+    timeout: 600          # このジョブのタイムアウト秒数（省略時はdefault_timeout）
+    venv: ".venv"         # Python仮想環境のパス（省略可）
+    env:                  # 追加の環境変数（省略可）
+      MY_KEY: "my_value"
 ```
 
 ## セクション詳細
@@ -64,6 +80,23 @@ Git操作に関する設定です。
     *   複数行記述可能です（YAML の `|` または `>` を使用）。
     *   スクリプトが非ゼロの終了コードを返すとジョブは失敗とみなされます。
     *   実行ディレクトリはクローンされたリポジトリのルートです。
+*   `timeout` (int, 任意): このジョブのタイムアウト秒数。省略時は `default_timeout` の値を使用します。
+*   `venv` (str, 任意): Python仮想環境のパス。指定するとその仮想環境でスクリプトが実行されます。
+*   `env` (Dict[str, str], 任意): ジョブに追加する環境変数のマップ。CI環境変数（`CI_JOB_ID`等）より優先されます。
+
+### グローバル設定
+
+*   `max_concurrent_jobs` (int, 任意): ジョブの同時実行数（デフォルト: 1）。
+*   `default_timeout` (int, 任意): デフォルトのジョブタイムアウト秒数（デフォルト: 3600）。
+*   `job_log_dir` (str, 任意): ジョブ別ログファイルの出力先（デフォルト: `log/jobs`）。
+
+### `notifications` セクション
+
+通知設定です（オプション）。
+
+*   `discord.webhook_url` (str, 必須): Discord Webhook URL。
+*   `discord.on_success` (bool, 任意): 成功時に通知するか（デフォルト: true）。
+*   `discord.on_failure` (bool, 任意): 失敗時に通知するか（デフォルト: true）。
 
 ## glob形式のパターンマッチング
 
@@ -235,6 +268,42 @@ jobs:
       python -m pip install -r requirements.txt
       python build.py
 ```
+
+## リポジトリ内CI設定 (.toyci.yaml)
+
+CI設定をCIサーバー側の `config.yaml` だけでなく、各リポジトリ内の `.toyci.yaml` ファイルに記述できます。
+Webhookを受信すると、トリガーされたリポジトリをシャロークローンして `.toyci.yaml` を読み込み、定義されたジョブを実行します。
+
+```yaml
+# .toyci.yaml（リポジトリルートに配置）
+jobs:
+  - name: "test"
+    watch_files:
+      - "src/**/*.py"
+      - "tests/**/*.py"
+    script: |
+      pip install -r requirements.txt
+      pytest
+    timeout: 300
+    venv: ".venv"
+    env:
+      PYTHONPATH: "src"
+```
+
+`repo_url` と `target_branch` はWebhookペイロードから自動補完されます。
+その他のフィールド（`name`, `watch_files`, `script`, `timeout`, `venv`, `env`）は `config.yaml` のジョブと同じです。
+
+## CI環境変数
+
+スクリプト実行時に以下の環境変数が自動的に注入されます。
+
+| 変数名 | 内容 |
+| --- | --- |
+| `CI_JOB_ID` | ジョブID（ジョブ名 + ランダムサフィックス） |
+| `CI_COMMIT_HASH` | トリガーとなったコミットのハッシュ |
+| `CI_BRANCH` | ブランチ名 |
+| `CI_REPO_URL` | リポジトリURL |
+| `CI_WORKSPACE` | ワークスペースの絶対パス |
 
 ## ベストプラクティス
 

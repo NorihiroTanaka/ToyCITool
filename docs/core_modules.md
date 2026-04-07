@@ -19,21 +19,50 @@ Pydanticベースの設定管理モジュールです。型安全な設定の読
 Git操作に関する設定を管理します。
 
 *   `repo_url` (Optional[str]): デフォルトのリポジトリURL
-*   `accessToken` (Optional[str]): アクセストークン
+*   `access_token` (Optional[str]): アクセストークン（YAMLでは `accessToken` で記述）
+
+### `DiscordNotificationConfig` / `NotificationsConfig` クラス
+
+Discord通知の設定を管理します。
+
+*   `discord.webhook_url` (str): Discord Webhook URL
+*   `discord.on_success` (bool): 成功時に通知するか（デフォルト: true）
+*   `discord.on_failure` (bool): 失敗時に通知するか（デフォルト: true）
+
+### `BaseJobConfig` クラス
+
+ジョブ設定の共通フィールドを定義します。
+
+*   `name` (str, 必須): ジョブ名
+*   `script` (str, 必須): 実行スクリプト
+*   `watch_files` (List[str]): 監視ファイルパターン（glob形式）
+*   `env` (Dict[str, str]): 追加の環境変数
+*   `timeout` (Optional[int]): タイムアウト秒数
+*   `venv` (Optional[str]): Python仮想環境のパス
 
 ### `JobConfig` クラス
 
-個別のジョブ設定を管理します。
+`config.yaml` の `jobs` セクションで定義するジョブ設定です（`BaseJobConfig` を継承）。
 
-*   `name` (str, 必須): ジョブ名
 *   `repo_url` (Optional[str]): リポジトリURL
 *   `target_branch` (Optional[str]): ターゲットブランチ
-*   `script` (str, 必須): 実行スクリプト
-*   `watch_files` (List[str]): 監視ファイルパターン（glob形式）
+
+### `RepoJobConfig` / `RepoCISettings` クラス
+
+リポジトリ内 `.toyci.yaml` から読み込まれるジョブ設定です。`RepoJobConfig` は `BaseJobConfig` を継承します。
+`repo_url` と `target_branch` はWebhookペイロードから自動補完されるため、`.toyci.yaml` には記述不要です。
 
 ### `Settings` クラス
 
 アプリケーション全体の設定を管理します。
+
+*   `server` (ServerConfig): サーバー設定
+*   `git` (GitConfig): Git設定
+*   `jobs` (List[JobConfig]): ジョブ一覧
+*   `notifications` (Optional[NotificationsConfig]): 通知設定
+*   `default_timeout` (int): デフォルトタイムアウト秒数（デフォルト: 3600）
+*   `max_concurrent_jobs` (int): 同時実行数（デフォルト: 1）
+*   `job_log_dir` (str): ジョブログ出力先（デフォルト: "log/jobs"）
 
 #### 主なメソッド
 
@@ -89,6 +118,8 @@ VCS操作の抽象インターフェースです。
 ジョブサービスの抽象インターフェースです。
 
 *   `run_job(job_config: Dict[str, Any], commit_info: Dict[str, Any]) -> None`: ジョブを実行します。
+*   `submit_job(job_config: Dict[str, Any], commit_info: Dict[str, Any]) -> None`: ジョブをキューに追加します。
+*   `shutdown(wait: bool = True) -> None`: ワーカースレッドを停止します。
 
 ### `IJobMatcher` (抽象基底クラス)
 
@@ -105,6 +136,7 @@ Webhookプロバイダーの抽象インターフェースです。
 *   `can_handle(headers: Dict[str, str]) -> bool`: リクエストを処理できるか判定します。
 *   `extract_changed_files(payload: Dict[str, Any]) -> Set[str]`: 変更ファイルを抽出します。
 *   `get_payload_meta(payload: Dict[str, Any]) -> Dict[str, Any]`: メタデータを抽出します。
+*   `extract_repo_info(payload: Dict[str, Any]) -> Optional[Dict[str, str]]`: リポジトリ情報（`repo_url`, `branch`）を抽出します。
 
 ## 4. JobMatcher ([`src/core/job_matcher.py`](../src/core/job_matcher.py:1))
 
@@ -123,26 +155,30 @@ Webhookプロバイダーの抽象インターフェースです。
 
 ## 5. JobService ([`src/core/job_service.py`](../src/core/job_service.py:1))
 
-CIジョブの実行ライフサイクルを管理するサービスクラスです。
+CIジョブの実行ライフサイクルと内部ジョブキューを管理するサービスクラスです。
 
 ### `JobService` クラス
 
-*   **役割**: ワークスペースの準備、コードのチェックアウト、スクリプト実行、結果のコミット・プッシュ、後処理を一貫して行います。
+*   **役割**: ワークスペースの準備、コードのチェックアウト、スクリプト実行、結果のコミット・プッシュ、後処理を一貫して行います。内部ジョブキューとワーカースレッドでジョブを非同期処理します。
 
 #### コンストラクタ
 
-*   `__init__(settings: Settings, workspace_manager: Optional[WorkspaceManager], vcs_handler_cls: Type[IVcsHandler], job_executor_cls: Type[IJobExecutor])`: 依存関係を注入します。
+*   `__init__(settings: Settings, workspace_manager: Optional[WorkspaceManager], vcs_handler_cls: Type[IVcsHandler], job_executor_cls: Type[IJobExecutor])`: 依存関係を注入し、ワーカースレッドを起動します。
 
 #### 主なメソッド
 
-*   `run_job(job_config: Dict[str, Any], commit_info: Dict[str, Any]) -> None`: ジョブを実行します。
+*   `submit_job(job_config: Dict[str, Any], commit_info: Dict[str, Any]) -> None`: ジョブをキューに追加します（非ブロッキング）。
+*   `run_job(job_config: Dict[str, Any], commit_info: Dict[str, Any]) -> None`: ジョブを同期実行します（ワーカースレッドから呼び出し）。
+    *   CI環境変数（`CI_JOB_ID`等）の構築
     *   設定の補完（`job_config` になければ `settings.git` から取得）
     *   必須項目の検証（`repo_url`, `target_branch`, `script`）
+*   `shutdown(wait: bool = True) -> None`: ワーカースレッドを停止します。アプリケーションシャットダウン時に呼び出されます。
 *   `_prepare_workspace(job_name: str) -> str`: 作業用ディレクトリを作成・清掃します。
 *   `_checkout_code(...) -> IVcsHandler`: リポジトリをクローン・チェックアウトします。
-*   `_execute_script(...) -> None`: 定義されたスクリプトを実行します。
+*   `_execute_script(...) -> None`: 定義されたスクリプトを実行します（`env`, `timeout_seconds`, `venv` を渡す）。
 *   `_handle_result(...) -> None`: 変更がある場合、自動コミットとプッシュを行います。
 *   `_cleanup_workspace(job_name: str) -> None`: 作業用ディレクトリを削除します（finally ブロックで必ず実行）。
+*   `_send_notification(...) -> None`: ジョブ完了後に通知を送信します。
 
 ## 6. JobTriggerService ([`src/core/job_trigger.py`](../src/core/job_trigger.py:1))
 
@@ -150,19 +186,21 @@ Webhookイベントに基づいて、どのジョブを実行すべきか判定�
 
 ### `JobTriggerService` クラス
 
-*   **役割**: Webhookペイロードを解析し、変更ファイルとジョブのトリガー条件を照合します。
+*   **役割**: Webhookペイロードを解析し、変更ファイルとジョブのトリガー条件を照合します。ローカル設定とリポジトリ内CI設定の両方を処理します。
 
 #### コンストラクタ
 
-*   `__init__(settings: Settings, job_service: IJobService, job_matcher: Optional[IJobMatcher])`: 依存関係を注入します。
+*   `__init__(settings: Settings, job_service: IJobService, job_matcher: Optional[IJobMatcher], repo_config_loader: Optional[RepoCIConfigLoader])`: 依存関係を注入します。
 
 #### 主なメソッド
 
-*   `process_webhook_event(provider: WebhookProvider, payload: Dict[str, Any], background_tasks: BackgroundTasks) -> List[str]`:
+*   `process_webhook_event(provider: WebhookProvider, payload: Dict[str, Any]) -> List[str]`:
     *   プロバイダーの `should_skip()` でスキップ判定
     *   プロバイダーの `extract_changed_files()` で変更ファイルを抽出
-    *   各ジョブに対して `JobMatcher.match()` で実行判定
-    *   マッチしたジョブを `BackgroundTasks` に追加
+    *   `config.yaml` の各ジョブに対して `JobMatcher.match()` で実行判定
+    *   プロバイダーの `extract_repo_info()` でリポジトリ情報を取得
+    *   `.toyci.yaml` の各ジョブに対しても同様に判定
+    *   マッチしたジョブを `job_service.submit_job()` でキューに追加
     *   トリガーされたジョブ名のリストを返す
 
 ## 7. WebhookHandler ([`src/core/webhook_handler.py`](../src/core/webhook_handler.py:1))
@@ -176,10 +214,11 @@ Webhookイベントに基づいて、どのジョブを実行すべきか判定�
 #### 主なメソッド
 
 *   `get_provider_id() -> str`: "github" を返します。
-*   `should_skip(payload: Dict[str, Any]) -> bool`: コミットメッセージに `[ci skip]` または `ci skip` が含まれるか判定します。
+*   `should_skip(payload: Dict[str, Any]) -> bool`: コミットメッセージに `[skip ci]` または `skip ci` が含まれるか判定します。
 *   `can_handle(headers: Dict[str, str]) -> bool`: `X-GitHub-Event` ヘッダーの存在を確認します（大文字小文字を無視）。
 *   `extract_changed_files(payload: Dict[str, Any]) -> Set[str]`: `commits` 配列から `added`, `modified`, `removed` ファイルを抽出します。
 *   `get_payload_meta(payload: Dict[str, Any]) -> Dict[str, Any]`: 最新のコミット情報を返します。
+*   `extract_repo_info(payload: Dict[str, Any]) -> Optional[Dict[str, str]]`: `repository.clone_url` とブランチ（`ref` から `refs/heads/` を除去）を抽出します。
 
 ## 8. WebhookProviderFactory ([`src/core/webhook_factory.py`](../src/core/webhook_factory.py:1))
 
@@ -240,14 +279,20 @@ VCS関連のユーティリティ関数を提供します。
 
 ### `ShellJobExecutor` クラス
 
-*   **役割**: シェルスクリプトを実行します。
+*   **役割**: シェルスクリプトをリアルタイムログ出力付きで実行します。
+
+#### コンストラクタ
+
+*   `__init__(job_log_dir: str = "log/jobs")`: ジョブログの出力先を指定します。
 
 #### 主なメソッド
 
-*   `execute(script: str, cwd: str) -> None`: 
-    *   `subprocess.run` を使用してスクリプトを実行
-    *   標準出力・標準エラー出力をキャプチャしてログに記録
-    *   実行に失敗（非ゼロ終了コード）した場合、例外を発生
+*   `execute(script: str, cwd: str, job_name: str, env: Optional[Dict[str, str]], timeout_seconds: Optional[int], venv: Optional[str]) -> None`: 
+    *   `subprocess.Popen` を使用してスクリプトをリアルタイムに実行
+    *   標準出力をジョブ別ログファイル（`log/jobs/{job_name}_{timestamp}.log`）とシステムログの両方に記録
+    *   `venv` を指定した場合、仮想環境の `bin/Scripts` を PATH に優先追加
+    *   タイムアウト発生時は `JobTimeoutError` を送出
+    *   非ゼロ終了コードの場合は `ScriptExecutionError` を送出
 
 ## 12. WorkspaceManager ([`src/core/workspace_manager.py`](../src/core/workspace_manager.py:1))
 
@@ -275,3 +320,76 @@ VCS関連のユーティリティ関数を提供します。
     *   `logging.yaml` からロギング設定を読み込み
     *   ログディレクトリの自動作成
     *   デフォルト設定へのフォールバック
+
+## 14. Notifier ([`src/core/notifier.py`](../src/core/notifier.py:1))
+
+ジョブの成功・失敗イベントを外部サービスに通知します。
+
+### `NotificationEvent` クラス
+
+通知イベントのデータを保持します。
+
+*   `job_name` (str): ジョブ名
+*   `success` (bool): 成功したか
+*   `branch` (str): ブランチ名
+*   `commit_hash` (str): コミットハッシュ
+*   `commit_message` (Optional[str]): コミットメッセージ
+*   `error_message` (Optional[str]): エラーメッセージ（失敗時）
+
+### `Notifier` (抽象基底クラス)
+
+通知の基底クラスです。
+
+*   `notify(event: NotificationEvent) -> None`: 通知を送信します。
+
+### `DiscordNotifier` クラス
+
+Discord Webhookに通知を送信します。Embedでジョブ名・ブランチ・コミット・エラーを表示します。
+
+### `CompositeNotifier` クラス
+
+複数の通知先にまとめて送信するコンポジットクラスです。
+
+### `NullNotifier` クラス
+
+通知設定がない場合の何もしないノットファイアです。
+
+### `build_notifier()` 関数
+
+*   `build_notifier(notifications_config: Optional[Dict[str, Any]]) -> Notifier`: 設定から適切な `Notifier` を構築して返します。設定が空の場合は `NullNotifier` を返します。
+
+## 15. RepoCIConfigLoader ([`src/core/repo_ci_config_loader.py`](../src/core/repo_ci_config_loader.py:1))
+
+リポジトリ内の CI 設定ファイル (`.toyci.yaml`) を読み込むローダーです。
+
+### `RepoCIConfigLoader` クラス
+
+*   **役割**: リポジトリをシャロークローンして `.toyci.yaml` を読み込み、`RepoCISettings` として返します。
+
+#### コンストラクタ
+
+*   `__init__(access_token: Optional[str])`: Gitアクセストークンを設定します。
+
+#### 主なメソッド
+
+*   `load_from_repo(repo_url: str, branch: str) -> Optional[RepoCISettings]`:
+    *   一時ディレクトリにリポジトリをクローン
+    *   `.toyci.yaml` を読み込んで `RepoCISettings` を返す
+    *   失敗した場合は `None` を返す（例外は発生させない）
+*   `load_from_path(repo_path: str) -> Optional[RepoCISettings]`: クローン済みディレクトリから `.toyci.yaml` を読み込みます。
+
+## 16. Exceptions ([`src/core/exceptions.py`](../src/core/exceptions.py:1))
+
+ToyCIToolのカスタム例外を定義します。すべての例外は `ToyCIError` を基底クラスとします。
+
+| 例外クラス | 説明 |
+| --- | --- |
+| `ToyCIError` | 全体の基底例外クラス |
+| `ScriptExecutionError` | スクリプト実行失敗（`stdout`, `stderr`, `return_code` 属性あり） |
+| `JobTimeoutError` | ジョブタイムアウト（`ScriptExecutionError` を継承、`timeout_seconds` 属性あり） |
+| `RepositoryError` | VCS操作に関するエラー |
+| `RepositoryNotInitializedError` | リポジトリが未初期化状態でのアクセスエラー |
+| `WorkspaceError` | ワークスペース操作に関するエラー |
+| `WorkspaceCleanupError` | ワークスペース削除失敗 |
+| `JobValidationError` | ジョブ設定のバリデーションエラー |
+| `WebhookPayloadError` | Webhookペイロードの解析エラー |
