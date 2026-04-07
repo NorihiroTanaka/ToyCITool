@@ -3,6 +3,9 @@ import stat
 import shutil
 import time
 import logging
+import threading
+from contextlib import contextmanager
+from typing import Dict
 
 from .exceptions import WorkspaceError, WorkspaceCleanupError
 
@@ -18,6 +21,31 @@ _CLEANUP_RETRY_DELAY_SEC: float = 1.0
 class WorkspaceManager:
     def __init__(self, base_dir: str = "./workspace"):
         self.base_dir = os.path.abspath(base_dir)
+        self._workspace_locks: Dict[str, threading.Lock] = {}
+        self._locks_guard = threading.Lock()
+
+    def _get_workspace_lock(self, job_name: str) -> threading.Lock:
+        """job_name に対応するロックを取得する（なければ作成）。"""
+        with self._locks_guard:
+            if job_name not in self._workspace_locks:
+                self._workspace_locks[job_name] = threading.Lock()
+            return self._workspace_locks[job_name]
+
+    @contextmanager
+    def workspace_lock(self, job_name: str):
+        """ワークスペースの排他ロックを取得するコンテキストマネージャ。
+
+        同名ジョブが同時実行される場合、先のジョブ終了まで待機する。
+        """
+        lock = self._get_workspace_lock(job_name)
+        logger.info(f"[{job_name}] ワークスペースロックを待機中...")
+        lock.acquire()
+        logger.info(f"[{job_name}] ワークスペースロックを取得しました。")
+        try:
+            yield
+        finally:
+            lock.release()
+            logger.info(f"[{job_name}] ワークスペースロックを解放しました。")
 
     def remove_readonly(self, func, path, _):
         """読み取り専用ファイルを削除するためのヘルパー関数"""

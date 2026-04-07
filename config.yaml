@@ -1,5 +1,6 @@
 # CI Tool Configuration
 default_timeout: 3600  # デフォルトのジョブタイムアウト（秒）
+# max_concurrent_jobs: 1  # 同時実行ジョブ数（デフォルト: 1＝直列実行）
 
 server:
   workspace: "workspace"

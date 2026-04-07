@@ -32,11 +32,6 @@ def mock_job_matcher():
 
 
 @pytest.fixture
-def mock_background_tasks():
-    return MagicMock()
-
-
-@pytest.fixture
 def trigger_service(mock_settings, mock_job_service, mock_job_matcher):
     return JobTriggerService(
         settings=mock_settings,
@@ -47,56 +42,45 @@ def trigger_service(mock_settings, mock_job_service, mock_job_matcher):
 
 class TestJobTriggerService:
     def test_should_skipがTrueの場合に空リストが返る(
-        self, trigger_service, mock_provider, mock_background_tasks
+        self, trigger_service, mock_provider, mock_job_service
     ):
         mock_provider.should_skip.return_value = True
-        result = trigger_service.process_webhook_event(
-            mock_provider, {}, mock_background_tasks
-        )
+        result = trigger_service.process_webhook_event(mock_provider, {})
         assert result == []
-        mock_background_tasks.add_task.assert_not_called()
+        mock_job_service.submit_job.assert_not_called()
 
     def test_変更ファイルが空の場合に空リストが返る(
-        self, trigger_service, mock_provider, mock_background_tasks
+        self, trigger_service, mock_provider, mock_job_service
     ):
         mock_provider.extract_changed_files.return_value = set()
-        result = trigger_service.process_webhook_event(
-            mock_provider, {}, mock_background_tasks
-        )
+        result = trigger_service.process_webhook_event(mock_provider, {})
         assert result == []
+        mock_job_service.submit_job.assert_not_called()
 
     def test_ジョブが1つマッチした場合にそのジョブ名が返る(
-        self, trigger_service, mock_provider, mock_background_tasks
+        self, trigger_service, mock_provider, mock_job_service
     ):
-        result = trigger_service.process_webhook_event(
-            mock_provider, {}, mock_background_tasks
-        )
+        result = trigger_service.process_webhook_event(mock_provider, {})
         assert result == ["test_job"]
-        mock_background_tasks.add_task.assert_called_once()
+        mock_job_service.submit_job.assert_called_once()
 
     def test_マッチしないジョブがスキップされる(
-        self, trigger_service, mock_provider, mock_background_tasks, mock_job_matcher
+        self, trigger_service, mock_provider, mock_job_service, mock_job_matcher
     ):
         mock_job_matcher.match.return_value = False
-        result = trigger_service.process_webhook_event(
-            mock_provider, {}, mock_background_tasks
-        )
+        result = trigger_service.process_webhook_event(mock_provider, {})
         assert result == []
-        mock_background_tasks.add_task.assert_not_called()
+        mock_job_service.submit_job.assert_not_called()
 
-    def test_background_tasksにadd_taskが正しい引数で呼ばれる(
-        self, trigger_service, mock_provider, mock_background_tasks, mock_job_service
+    def test_submit_jobが正しい引数で呼ばれる(
+        self, trigger_service, mock_provider, mock_job_service
     ):
-        trigger_service.process_webhook_event(
-            mock_provider, {}, mock_background_tasks
-        )
-        mock_background_tasks.add_task.assert_called_once()
-        call_args = mock_background_tasks.add_task.call_args
-        # 第1引数: job_service.run_job
-        assert call_args[0][0] == mock_job_service.run_job
-        # 第2引数: job_dict (辞書)
-        job_dict = call_args[0][1]
+        trigger_service.process_webhook_event(mock_provider, {})
+        mock_job_service.submit_job.assert_called_once()
+        call_args = mock_job_service.submit_job.call_args
+        # 第1引数: job_dict (辞書)
+        job_dict = call_args[0][0]
         assert job_dict["name"] == "test_job"
-        # 第3引数: payload_meta
-        payload_meta = call_args[0][2]
+        # 第2引数: payload_meta
+        payload_meta = call_args[0][1]
         assert payload_meta["id"] == "abc123"

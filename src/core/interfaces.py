@@ -28,6 +28,16 @@ class IJobService(ABC):
     def run_job(self, job_config: Dict[str, Any], commit_info: Dict[str, Any]) -> None:
         pass
 
+    @abstractmethod
+    def submit_job(self, job_config: Dict[str, Any], commit_info: Dict[str, Any]) -> None:
+        """ジョブをキューに追加する。"""
+        pass
+
+    @abstractmethod
+    def shutdown(self, wait: bool = True) -> None:
+        """ワーカースレッドを停止する。"""
+        pass
+
 class IJobMatcher(ABC):
     @abstractmethod
     def match(self, job_config: Dict[str, Any], changed_files: Set[str]) -> bool:
