@@ -27,15 +27,27 @@ class TestGitConfig:
         assert config.access_token == "token"
 
 
+class TestJobConfigScripts:
+    """JobConfigのscriptsフィールドテスト。"""
+
+    def test_scriptsを設定できる(self):
+        config = JobConfig(name="test", scripts=["step1.cmd", "step2.cmd"])
+        assert config.scripts == ["step1.cmd", "step2.cmd"]
+
+    def test_scriptsのデフォルトは空リスト(self):
+        config = JobConfig(name="test")
+        assert config.scripts == []
+
+
 class TestJobConfigTimeout:
     """JobConfigのtimeoutフィールドテスト。"""
 
     def test_timeoutのデフォルトはNone(self):
-        config = JobConfig(name="test", script="echo hi")
+        config = JobConfig(name="test", scripts=["echo hi"])
         assert config.timeout is None
 
     def test_timeoutを設定できる(self):
-        config = JobConfig(name="test", script="echo hi", timeout=600)
+        config = JobConfig(name="test", scripts=["echo hi"], timeout=600)
         assert config.timeout == 600
 
 

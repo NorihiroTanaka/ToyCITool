@@ -20,7 +20,8 @@ class TestRepoCIConfigLoaderLoadFromPath:
             textwrap.dedent("""\
                 jobs:
                   - name: build
-                    script: make build
+                    scripts:
+                      - make build
                     watch_files:
                       - "src/*.py"
             """),
@@ -31,7 +32,7 @@ class TestRepoCIConfigLoaderLoadFromPath:
         assert result is not None
         assert len(result.jobs) == 1
         assert result.jobs[0].name == "build"
-        assert result.jobs[0].script == "make build"
+        assert result.jobs[0].scripts == ["make build"]
         assert result.jobs[0].watch_files == ["src/*.py"]
 
     def test_設定ファイルがない場合はNoneが返る(self, tmp_path, loader):
@@ -44,9 +45,11 @@ class TestRepoCIConfigLoaderLoadFromPath:
             textwrap.dedent("""\
                 jobs:
                   - name: test
-                    script: pytest
+                    scripts:
+                      - pytest
                   - name: lint
-                    script: flake8
+                    scripts:
+                      - flake8
                     env:
                       MAX_LINE: "120"
                     timeout: 300

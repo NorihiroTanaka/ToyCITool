@@ -70,7 +70,7 @@ def test_job_service_run_job_success(mock_settings, mock_workspace_manager, mock
         "name": "test_job",
         "repo_url": "https://github.com/example/repo.git",
         "target_branch": "main",
-        "script": "echo 'hello'"
+        "scripts": ["echo 'hello'"],
     }
     commit_info = {"id": "123", "modified": []}
 
@@ -111,7 +111,7 @@ def test_job_service_run_job_with_changes(mock_settings, mock_workspace_manager,
         "name": "test_job_changes",
         "repo_url": "https://github.com/example/repo.git",
         "target_branch": "develop",
-        "script": "echo 'build'"
+        "scripts": ["echo 'build'"],
     }
     commit_info = {"id": "abc", "modified": ["file1.txt"]}
 
@@ -138,7 +138,7 @@ def test_job_service_user_env_merged_with_ci_env(mock_settings, mock_workspace_m
         "name": "env_test_job",
         "repo_url": "https://github.com/example/repo.git",
         "target_branch": "develop",
-        "script": "echo 'test'",
+        "scripts": ["echo 'test'"],
         "env": {"MY_VAR": "my_value", "BUILD_TYPE": "release"},
     }
     commit_info = {"id": "def456", "modified": ["file.py"]}
@@ -168,7 +168,7 @@ def test_job_service_ci_env_overrides_user_env(mock_settings, mock_workspace_man
         "name": "override_test",
         "repo_url": "https://github.com/example/repo.git",
         "target_branch": "main",
-        "script": "echo 'test'",
+        "scripts": ["echo 'test'"],
         "env": {"CI_BRANCH": "user_branch"},
     }
     commit_info = {"id": "abc123", "modified": []}
@@ -195,7 +195,7 @@ def test_job_service_passes_job_timeout_to_executor(mock_settings, mock_workspac
         "name": "timeout_test",
         "repo_url": "https://github.com/example/repo.git",
         "target_branch": "main",
-        "script": "echo 'hello'",
+        "scripts": ["echo 'hello'"],
         "timeout": 600,
     }
     commit_info = {"id": "123", "modified": []}
@@ -221,7 +221,7 @@ def test_job_service_uses_default_timeout_when_job_has_no_timeout(mock_settings,
         "name": "no_timeout_test",
         "repo_url": "https://github.com/example/repo.git",
         "target_branch": "main",
-        "script": "echo 'hello'",
+        "scripts": ["echo 'hello'"],
     }
     commit_info = {"id": "123", "modified": []}
 
@@ -240,12 +240,38 @@ def test_job_service_validation_error(mock_settings):
         "name": "invalid_job",
         "repo_url": "http://example.com",
         "target_branch": "main",
-        # "script" is missing
+        # "scripts" is missing
     }
     commit_info = {}
 
     with pytest.raises(JobValidationError):
         service.run_job(job_info, commit_info)
+
+    service.shutdown()
+
+
+def test_job_service_run_job_multiple_scripts(mock_settings, mock_workspace_manager, mock_vcs_handler_cls, mock_job_executor_cls, mock_vcs_handler, mock_job_executor):
+    """scriptsリストの全スクリプトが順次実行されること"""
+    service = JobService(
+        settings=mock_settings,
+        workspace_manager=mock_workspace_manager,
+        vcs_handler_cls=mock_vcs_handler_cls,
+        job_executor_cls=mock_job_executor_cls
+    )
+
+    job_info = {
+        "name": "multi_script_job",
+        "repo_url": "https://github.com/example/repo.git",
+        "target_branch": "main",
+        "scripts": ["step1.cmd", "step2.cmd", "step3.cmd"],
+    }
+    commit_info = {"id": "abc", "modified": []}
+
+    service.run_job(job_info, commit_info)
+
+    assert mock_job_executor.execute.call_count == 3
+    called_scripts = [call[0][0] for call in mock_job_executor.execute.call_args_list]
+    assert called_scripts == ["step1.cmd", "step2.cmd", "step3.cmd"]
 
     service.shutdown()
 
@@ -263,7 +289,7 @@ def test_job_service_submit_job_queues_and_executes(mock_settings, mock_workspac
         "name": "queued_job",
         "repo_url": "https://github.com/example/repo.git",
         "target_branch": "main",
-        "script": "echo 'queued'",
+        "scripts": ["echo 'queued'"],
     }
     commit_info = {"id": "999", "modified": []}
 

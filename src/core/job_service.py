@@ -104,17 +104,16 @@ class JobService(IJobService):
 
         repo_url = job_config.get("repo_url") or self.settings.git.repo_url
         target_branch = job_config.get("target_branch")
-        script = job_config.get("script")
+        scripts: List[str] = list(job_config.get("scripts") or [])
 
-        if not repo_url or not target_branch or not script:
+        if not repo_url or not target_branch or not scripts:
             raise JobValidationError(
-                f"[{job_name}] repo_url, target_branch, script は必須です。"
-                f" repo_url={repo_url}, target_branch={target_branch}, script={script}"
+                f"[{job_name}] repo_url, target_branch, scripts は必須です。"
+                f" repo_url={repo_url}, target_branch={target_branch}, scripts={scripts}"
             )
 
         repo_url_str: str = str(repo_url)
         target_branch_str: str = str(target_branch)
-        script_str: str = str(script)
 
         user_env: Dict[str, str] = job_config.get("env", {})
         venv_path: Optional[str] = job_config.get("venv")
@@ -138,7 +137,8 @@ class JobService(IJobService):
                     env = {**user_env, **ci_env}
 
                     with self._checkout_code(job_name, work_dir, repo_url_str, target_branch_str) as vcs_handler:
-                        self._execute_script(job_name, work_dir, script_str, env, timeout_seconds=effective_timeout, venv=venv_path)
+                        for script in scripts:
+                            self._execute_script(job_name, work_dir, script, env, timeout_seconds=effective_timeout, venv=venv_path)
                         self._handle_result(job_name, vcs_handler, commit_info, target_branch_str)
                 finally:
                     self._cleanup_workspace(job_name)

@@ -21,7 +21,9 @@ jobs:
     watch_files:
       - "src/*.py"
       - "requirements.txt"
-    script: "scripts\\build.cmd"
+    scripts:
+      - "scripts\\build.cmd"
+      - "scripts\\test.cmd"
     target_branch: "main"
     # venv: ".venv"  # Python仮想環境のパス（省略可）。相対パスはワークスペースからの相対、絶対パスも指定可能。
     env:

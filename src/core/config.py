@@ -27,7 +27,7 @@ class GitConfig(BaseModel):
 class BaseJobConfig(BaseModel):
     """ジョブ設定の共通フィールド。"""
     name: str
-    script: str
+    scripts: List[str] = Field(default_factory=list)
     watch_files: List[str] = Field(default_factory=list)
     env: Dict[str, str] = Field(default_factory=dict)
     timeout: Optional[int] = None
