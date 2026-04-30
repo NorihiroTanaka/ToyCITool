@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from contextlib import asynccontextmanager
@@ -57,7 +58,10 @@ async def webhook(request: Request):
     service = container.job_trigger_service
 
     try:
-        triggered_jobs = service.process_webhook_event(provider, payload)
+        loop = asyncio.get_event_loop()
+        triggered_jobs = await loop.run_in_executor(
+            None, service.process_webhook_event, provider, payload
+        )
         return {"status": "ok", "triggered_jobs": triggered_jobs}
     except ToyCIError as e:
         logger.error(f"Webhook処理でエラー: {e}")
