@@ -60,6 +60,11 @@ tdd-workflow スキル経由でテストを書く場合も含め、以下の規�
 
 リファクタリング・設計改善・コード整理を行う場合は、`.agents/skills/refactor-planner/SKILL.md` のスキルを使用すること。
 
+### バグ修正・エラー修正
+
+バグ修正・エラー修正・問題修正を行う場合は、`.agents/skills/fix-with-plan/SKILL.md` のスキルを使用すること。
+計画なしに即実装しないこと。
+
 ## スキル活用ガイド
 
 | 状況 | 使用するスキル |
@@ -68,6 +73,7 @@ tdd-workflow スキル経由でテストを書く場合も含め、以下の規�
 | タスクをサブタスクに分割したい（粒度が大きい場合） | `.agents/skills/task-splitter/SKILL.md` |
 | TDD（テスト駆動開発）で実装したい | `.agents/skills/tdd-workflow/SKILL.md` |
 | リファクタリング・設計改善・コード整理をしたい | `.agents/skills/refactor-planner/SKILL.md` |
+| バグ修正・エラー修正・問題修正をしたい | `.agents/skills/fix-with-plan/SKILL.md` |
 
 ## 設計パターン
 - **DI（依存性注入）**: `Container`クラスでサービスインスタンス管理
